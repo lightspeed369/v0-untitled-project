@@ -9,8 +9,8 @@ import { Toaster } from "@/components/ui/toaster"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Track Class Calculator",
-  description: "Calculate your vehicle's track classification based on modifications",
+  title: "LightSpeed Time Trial Classification Calculator",
+  description: "Calculate your vehicle's classification based on modifications",
   icons: {
     icon: "/favicon.ico",
   },

@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { AlertCircle, Car, Info, Save, Send } from "lucide-react"
+import { AlertCircle, Info, Save, Send } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { trackConfig } from "@/lib/track-config"
 import { toast } from "@/components/ui/use-toast"
@@ -182,6 +182,7 @@ export default function TrackClassCalculator() {
 
   // Save current configuration
   const saveConfiguration = () => {
+    const timestamp = new Date().toISOString()
     const config = {
       make,
       model,
@@ -191,7 +192,7 @@ export default function TrackClassCalculator() {
       modificationPoints,
       totalPoints,
       finalClass,
-      timestamp: new Date().toISOString(),
+      timestamp,
     }
     setSavedConfigs((prev) => [config, ...prev])
 
@@ -199,8 +200,19 @@ export default function TrackClassCalculator() {
     try {
       const existingConfigs = JSON.parse(localStorage.getItem("savedConfigs") || "[]")
       localStorage.setItem("savedConfigs", JSON.stringify([config, ...existingConfigs]))
+
+      // Show success message
+      toast({
+        title: "Configuration Saved",
+        description: `Your ${make} ${model} configuration has been saved successfully.`,
+      })
     } catch (error) {
       console.error("Error saving to localStorage:", error)
+      toast({
+        variant: "destructive",
+        title: "Save Failed",
+        description: "There was an error saving your configuration. Please try again.",
+      })
     }
   }
 
@@ -324,9 +336,13 @@ export default function TrackClassCalculator() {
 
     try {
       const config = savedConfigs[selectedConfigIndex]
+      const timestamp = new Date().toISOString()
 
       // Format the data for Google Form submission
       const formData = new FormData()
+
+      // Add timestamp to the form data
+      formData.append("entry.timestamp", timestamp)
       formData.append("entry.123456789", driverName) // Replace with actual form field IDs
       formData.append("entry.234567890", driverEmail)
       formData.append("entry.345678901", carNumber)
@@ -343,21 +359,18 @@ export default function TrackClassCalculator() {
         formData.append("entry.123123123", team)
       }
 
-      // In a real implementation, you would submit to the Google Form URL
-      // For this example, we'll simulate a successful submission
-      // const response = await fetch('https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse', {
-      //   method: 'POST',
-      //   body: formData,
-      //   mode: 'no-cors'
-      // })
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // Submit to the Google Sheet
+      // Note: This URL needs to be the form submission URL, not the spreadsheet URL directly
+      const response = await fetch("https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse", {
+        method: "POST",
+        body: formData,
+        mode: "no-cors",
+      })
 
       setSubmissionSuccess(true)
       toast({
         title: "Submission successful",
-        description: "Your configuration has been submitted successfully.",
+        description: "Your configuration has been submitted successfully to LightSpeed Time Trial.",
       })
 
       // Reset form fields
@@ -392,11 +405,11 @@ export default function TrackClassCalculator() {
         <TabsContent value="calculator" className="space-y-6">
           <Card>
             <CardHeader className="border-b border-[#fec802]/20">
-              <CardTitle className="flex items-center gap-2">
-                <Car className="h-5 w-5 text-[#fec802]" />
-                Vehicle Selection
-              </CardTitle>
-              <CardDescription>Select your vehicle make and model to determine the base class</CardDescription>
+              <CardTitle>LightSpeed Time Trial Classification Calculator</CardTitle>
+              <CardDescription>
+                Select all modifications that apply to your vehicle
+                <span className="text-red-400 ml-1">(tire selection is required)</span>
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -679,7 +692,8 @@ export default function TrackClassCalculator() {
                 <div className="text-center py-8">
                   <div className="bg-green-900/20 text-green-400 p-4 rounded-lg mb-4">
                     <h3 className="text-lg font-medium">Submission Successful!</h3>
-                    <p>Your configuration has been submitted successfully.</p>
+                    <p>Your configuration has been submitted successfully to LightSpeed Time Trial.</p>
+                    <p className="text-sm mt-2">Submission time: {new Date().toLocaleString()}</p>
                   </div>
                   <Button
                     onClick={() => setSubmissionSuccess(false)}
