@@ -36,6 +36,7 @@ export default function TrackClassCalculator() {
     aero: [],
     tires: [],
     weight: [],
+    electronics: [], // Add your new category here
   })
   const [totalPoints, setTotalPoints] = useState<number>(0)
   const [baseClassPoints, setBaseClassPoints] = useState<number>(0)
@@ -203,6 +204,7 @@ export default function TrackClassCalculator() {
       aero: [],
       tires: [],
       weight: [],
+      electronics: [],
     })
     setBaseClassPoints(0)
     setModificationPoints(0)
@@ -526,6 +528,7 @@ export default function TrackClassCalculator() {
                             Tires*
                           </SelectItem>
                           <SelectItem value="weight">Weight</SelectItem>
+                          <SelectItem value="electronics">Electronics</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -575,6 +578,12 @@ export default function TrackClassCalculator() {
                           className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
                         >
                           Weight
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="electronics"
+                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                        >
+                          Electronics
                         </TabsTrigger>
                       </TabsList>
                     </ScrollArea>

@@ -200,6 +200,7 @@ export const trackConfig = {
       "Supra 2.0": { baseClass: "TTD" },
       "GR 86 2.4": { baseClass: "TTE*" },
       "GR Corolla": { baseClass: "TTC" },
+      "GR Supra 3.0 (2023+)": { baseClass: "TTC*" },
     },
     Tesla: {
       "Model 3 SM": { baseClass: "TTD" },
@@ -212,6 +213,10 @@ export const trackConfig = {
       GTI: { baseClass: "TTE" },
       "Jetta GLI": { baseClass: "TTE" },
     },
+    Kia: {
+      "Stinger GT": { baseClass: "TTD" },
+      "EV6 GT": { baseClass: "TTC" },
+    },
   },
   engine: [
     "Aftermarket Air Intake (1)",
@@ -221,6 +226,7 @@ export const trackConfig = {
     "Aftermarket Turbocharger/Supercharger  (5)",
     "NA Vehicle ECU Tuning  (3)",
     "FI Vehicle ECU Tuning  (6)",
+    "Aftermarket Camshafts (4)",
   ],
   drivetrain: ["Aftermarket driveshaft (1)", "Aftermarket LSD  (2)"],
   suspension: [
@@ -286,6 +292,7 @@ export const trackConfig = {
       "Aftermarket Turbocharger/Supercharger  (5)": 5,
       "NA Vehicle ECU Tuning  (3)": 3,
       "FI Vehicle ECU Tuning  (6)": 6,
+      "Aftermarket Camshafts (4)": 4,
     },
     drivetrain: {
       "Aftermarket driveshaft (1)": 1,
@@ -331,4 +338,5 @@ export const trackConfig = {
       "Roll Bar 6 points or more (-2)": -2,
     },
   },
+  electronics: ["Aftermarket Engine Management System (5)", "Data Acquisition System (0)", "Launch Control (2)"],
 }
