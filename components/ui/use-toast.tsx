@@ -1,6 +1,7 @@
 "use client"
 
 // Shadcn/ui toast component
+// Make sure the import statement only imports available React features
 import * as React from "react"
 
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
