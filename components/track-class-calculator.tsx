@@ -20,8 +20,11 @@ import { ToastAction } from "@/components/ui/toast"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { useMobile } from "@/hooks/use-mobile"
 
 export default function TrackClassCalculator() {
+  const isMobile = useMobile()
+
   const [make, setMake] = useState<string>("")
   const [model, setModel] = useState<string>("")
   const [baseClass, setBaseClass] = useState<string>("")
@@ -45,7 +48,8 @@ export default function TrackClassCalculator() {
 
   // Submission form states
   const [selectedConfigIndex, setSelectedConfigIndex] = useState<number | null>(null)
-  const [driverName, setDriverName] = useState<string>("")
+  const [firstName, setFirstName] = useState<string>("")
+  const [lastName, setLastName] = useState<string>("")
   const [driverEmail, setDriverEmail] = useState<string>("")
   const [carNumber, setCarNumber] = useState<string>("")
   const [team, setTeam] = useState<string>("")
@@ -323,7 +327,7 @@ export default function TrackClassCalculator() {
       return
     }
 
-    if (!driverName || !driverEmail || !carNumber || !effectiveDate) {
+    if (!firstName || !lastName || !driverEmail || !carNumber || !effectiveDate) {
       toast({
         variant: "destructive",
         title: "Missing information",
@@ -338,12 +342,15 @@ export default function TrackClassCalculator() {
       const config = savedConfigs[selectedConfigIndex]
       const timestamp = new Date().toISOString()
 
+      // Combine first and last name for submission
+      const fullName = `${firstName} ${lastName}`
+
       // Format the data for Google Form submission using the exact field IDs from your form
       const formData = new FormData()
 
       // Map form fields to the correct entry IDs from your Google Form
       formData.append("entry.258378709", effectiveDate) // Effective Date
-      formData.append("entry.163721629", driverName) // Driver Name
+      formData.append("entry.163721629", fullName) // Driver Name (combined)
       formData.append("entry.292301949", `${config.make} ${config.model}`) // Vehicle Make/Model
       formData.append("entry.1339041663", carNumber) // Car Number
       formData.append("entry.422981728", driverEmail) // Email Address
@@ -368,7 +375,8 @@ export default function TrackClassCalculator() {
       })
 
       // Reset form fields
-      setDriverName("")
+      setFirstName("")
+      setLastName("")
       setDriverEmail("")
       setCarNumber("")
       setTeam("")
@@ -390,7 +398,7 @@ export default function TrackClassCalculator() {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="calculator" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className={`grid w-full ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
           <TabsTrigger value="calculator">Calculator</TabsTrigger>
           <TabsTrigger value="saved">Saved Configurations</TabsTrigger>
           <TabsTrigger value="submit">Submit Configuration</TabsTrigger>
@@ -478,7 +486,7 @@ export default function TrackClassCalculator() {
               </CardHeader>
               <CardContent className="pt-6">
                 <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                  <TabsList className="grid grid-cols-3 md:grid-cols-7">
+                  <TabsList className={`grid ${isMobile ? "grid-cols-4 gap-1" : "grid-cols-7"}`}>
                     <TabsTrigger value="engine">Engine</TabsTrigger>
                     <TabsTrigger value="drivetrain">Drivetrain</TabsTrigger>
                     <TabsTrigger value="suspension">Suspension</TabsTrigger>
@@ -503,7 +511,7 @@ export default function TrackClassCalculator() {
                         </Alert>
                       )}
 
-                      <ScrollArea className="h-[300px] pr-4">
+                      <ScrollArea className={`${isMobile ? "h-[250px]" : "h-[300px]"} pr-4`}>
                         {Object.entries(items).map(([item, points], index) => (
                           <div key={item} className="flex items-start space-x-2 py-2">
                             <Checkbox
@@ -630,11 +638,11 @@ export default function TrackClassCalculator() {
                   <p className="text-sm mt-2">Calculate and save a configuration to see it here.</p>
                 </div>
               ) : (
-                <ScrollArea className="h-[400px]">
+                <ScrollArea className={`${isMobile ? "h-[350px]" : "h-[400px]"}`}>
                   <div className="space-y-4">
                     {savedConfigs.map((config, index) => (
                       <div key={index} className="p-4 bg-gray-800 rounded-lg">
-                        <div className="flex justify-between items-start">
+                        <div className={`flex ${isMobile ? "flex-col" : "justify-between"} items-start`}>
                           <div>
                             <h3 className="font-medium">
                               {config.make} {config.model}
@@ -644,7 +652,7 @@ export default function TrackClassCalculator() {
                               {new Date(config.timestamp).toLocaleTimeString()}
                             </p>
                           </div>
-                          <div className="flex gap-2">
+                          <div className={`flex gap-2 ${isMobile ? "mt-2" : ""}`}>
                             <Badge className={`${getClassColor(cleanBaseClass(config.baseClass))} text-white`}>
                               Base: {config.baseClass}
                             </Badge>
@@ -717,12 +725,12 @@ export default function TrackClassCalculator() {
                               <Label htmlFor={`config-${index}`} className="text-base font-medium">
                                 {config.make} {config.model}
                               </Label>
-                              <div className="flex justify-between items-center mt-2">
+                              <div className={`flex ${isMobile ? "flex-col" : "justify-between"} items-start mt-2`}>
                                 <div className="text-sm text-gray-400">
                                   {new Date(config.timestamp).toLocaleDateString()} at{" "}
                                   {new Date(config.timestamp).toLocaleTimeString()}
                                 </div>
-                                <div className="flex gap-2">
+                                <div className={`flex gap-2 ${isMobile ? "mt-1" : ""}`}>
                                   <Badge className={`${getClassColor(cleanBaseClass(config.baseClass))} text-white`}>
                                     Base: {config.baseClass}
                                   </Badge>
@@ -744,12 +752,22 @@ export default function TrackClassCalculator() {
                     <h3 className="text-lg font-medium">2. Driver Information</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="driver-name">Driver Name*</Label>
+                        <Label htmlFor="first-name">First Name*</Label>
                         <Input
-                          id="driver-name"
-                          value={driverName}
-                          onChange={(e) => setDriverName(e.target.value)}
-                          placeholder="Enter your full name"
+                          id="first-name"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          placeholder="Enter your first name"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="last-name">Last Name*</Label>
+                        <Input
+                          id="last-name"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          placeholder="Enter your last name"
                           required
                         />
                       </div>
