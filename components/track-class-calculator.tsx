@@ -48,7 +48,8 @@ export default function TrackClassCalculator() {
   const [driverName, setDriverName] = useState<string>("")
   const [driverEmail, setDriverEmail] = useState<string>("")
   const [carNumber, setCarNumber] = useState<string>("")
-  const [eventDate, setEventDate] = useState<string>("")
+  const [team, setTeam] = useState<string>("")
+  const [effectiveDate, setEffectiveDate] = useState<string>("")
   const [comments, setComments] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [submissionSuccess, setSubmissionSuccess] = useState<boolean>(false)
@@ -310,7 +311,7 @@ export default function TrackClassCalculator() {
       return
     }
 
-    if (!driverName || !driverEmail || !carNumber || !eventDate) {
+    if (!driverName || !driverEmail || !carNumber || !effectiveDate) {
       toast({
         variant: "destructive",
         title: "Missing information",
@@ -329,13 +330,18 @@ export default function TrackClassCalculator() {
       formData.append("entry.123456789", driverName) // Replace with actual form field IDs
       formData.append("entry.234567890", driverEmail)
       formData.append("entry.345678901", carNumber)
-      formData.append("entry.456789012", eventDate)
+      formData.append("entry.456789012", effectiveDate)
       formData.append("entry.567890123", `${config.make} ${config.model}`)
       formData.append("entry.678901234", config.baseClass)
       formData.append("entry.789012345", config.finalClass)
       formData.append("entry.890123456", config.totalPoints.toString())
       formData.append("entry.901234567", formatModificationsForSubmission(config.mods))
       formData.append("entry.012345678", comments)
+
+      // Add team if provided
+      if (team) {
+        formData.append("entry.123123123", team)
+      }
 
       // In a real implementation, you would submit to the Google Form URL
       // For this example, we'll simulate a successful submission
@@ -358,7 +364,8 @@ export default function TrackClassCalculator() {
       setDriverName("")
       setDriverEmail("")
       setCarNumber("")
-      setEventDate("")
+      setTeam("")
+      setEffectiveDate("")
       setComments("")
       setSelectedConfigIndex(null)
     } catch (error) {
@@ -384,14 +391,14 @@ export default function TrackClassCalculator() {
 
         <TabsContent value="calculator" className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="border-b border-[#fec802]/20">
               <CardTitle className="flex items-center gap-2">
-                <Car className="h-5 w-5" />
+                <Car className="h-5 w-5 text-[#fec802]" />
                 Vehicle Selection
               </CardTitle>
               <CardDescription>Select your vehicle make and model to determine the base class</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="make">Make</Label>
@@ -455,14 +462,14 @@ export default function TrackClassCalculator() {
 
           {baseClass && (
             <Card>
-              <CardHeader>
+              <CardHeader className="border-b border-[#fec802]/20">
                 <CardTitle>Modifications</CardTitle>
                 <CardDescription>
                   Select all modifications that apply to your vehicle
                   <span className="text-red-400 ml-1">(tire selection is required)</span>
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
                   <TabsList className="grid grid-cols-3 md:grid-cols-7">
                     <TabsTrigger value="engine">Engine</TabsTrigger>
@@ -523,8 +530,11 @@ export default function TrackClassCalculator() {
                   ))}
                 </Tabs>
               </CardContent>
-              <CardFooter className="flex flex-col sm:flex-row gap-4 justify-between">
-                <Button onClick={calculateResults} className="w-full sm:w-auto">
+              <CardFooter className="flex flex-col sm:flex-row gap-4 justify-between border-t border-[#fec802]/20 pt-6">
+                <Button
+                  onClick={calculateResults}
+                  className="w-full sm:w-auto bg-[#fec802] hover:bg-[#fec802]/80 text-black"
+                >
                   Calculate Class
                 </Button>
                 <Button variant="outline" onClick={resetForm} className="w-full sm:w-auto">
@@ -536,11 +546,11 @@ export default function TrackClassCalculator() {
 
           {showResults && (
             <Card>
-              <CardHeader>
+              <CardHeader className="border-b border-[#fec802]/20">
                 <CardTitle>Results</CardTitle>
                 <CardDescription>Your vehicle's classification based on modifications</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-4 bg-gray-800 rounded-lg text-center">
                     <p className="text-sm text-gray-400">Base Class</p>
@@ -602,11 +612,11 @@ export default function TrackClassCalculator() {
 
         <TabsContent value="saved">
           <Card>
-            <CardHeader>
+            <CardHeader className="border-b border-[#fec802]/20">
               <CardTitle>Saved Configurations</CardTitle>
               <CardDescription>Your previously saved vehicle configurations</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               {savedConfigs.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <p>No saved configurations yet.</p>
@@ -641,7 +651,7 @@ export default function TrackClassCalculator() {
                           <p>Total Points: {config.totalPoints}</p>
                           <Button
                             variant="link"
-                            className="p-0 h-auto text-blue-400 text-sm"
+                            className="p-0 h-auto text-[#fec802] text-sm"
                             onClick={() => loadConfiguration(config)}
                           >
                             Load Configuration
@@ -658,20 +668,25 @@ export default function TrackClassCalculator() {
 
         <TabsContent value="submit">
           <Card>
-            <CardHeader>
+            <CardHeader className="border-b border-[#fec802]/20">
               <CardTitle>Submit Configuration</CardTitle>
               <CardDescription>
                 Submit your vehicle configuration for event registration or technical inspection
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               {submissionSuccess ? (
                 <div className="text-center py-8">
                   <div className="bg-green-900/20 text-green-400 p-4 rounded-lg mb-4">
                     <h3 className="text-lg font-medium">Submission Successful!</h3>
                     <p>Your configuration has been submitted successfully.</p>
                   </div>
-                  <Button onClick={() => setSubmissionSuccess(false)}>Submit Another Configuration</Button>
+                  <Button
+                    onClick={() => setSubmissionSuccess(false)}
+                    className="bg-[#fec802] hover:bg-[#fec802]/80 text-black"
+                  >
+                    Submit Another Configuration
+                  </Button>
                 </div>
               ) : savedConfigs.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
@@ -741,6 +756,15 @@ export default function TrackClassCalculator() {
                         />
                       </div>
                       <div className="space-y-2">
+                        <Label htmlFor="team">Team</Label>
+                        <Input
+                          id="team"
+                          value={team}
+                          onChange={(e) => setTeam(e.target.value)}
+                          placeholder="Enter your team name (optional)"
+                        />
+                      </div>
+                      <div className="space-y-2">
                         <Label htmlFor="car-number">Car Number*</Label>
                         <Input
                           id="car-number"
@@ -751,12 +775,12 @@ export default function TrackClassCalculator() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="event-date">Event Date*</Label>
+                        <Label htmlFor="effective-date">Effective Date*</Label>
                         <Input
-                          id="event-date"
+                          id="effective-date"
                           type="date"
-                          value={eventDate}
-                          onChange={(e) => setEventDate(e.target.value)}
+                          value={effectiveDate}
+                          onChange={(e) => setEffectiveDate(e.target.value)}
                           required
                         />
                       </div>
@@ -783,11 +807,15 @@ export default function TrackClassCalculator() {
                     </AlertDescription>
                   </Alert>
 
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Button
+                    type="submit"
+                    className="w-full bg-[#fec802] hover:bg-[#fec802]/80 text-black"
+                    disabled={isSubmitting}
+                  >
                     {isSubmitting ? (
                       <>
                         <svg
-                          className="animate-spin -ml-1 mr-3 h-4 w-4 text-white"
+                          className="animate-spin -ml-1 mr-3 h-4 w-4 text-black"
                           xmlns="http://www.w3.org/2000/svg"
                           fill="none"
                           viewBox="0 0 24 24"
