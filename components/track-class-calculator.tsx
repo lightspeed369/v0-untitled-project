@@ -45,6 +45,7 @@ export default function TrackClassCalculator() {
   const [showResults, setShowResults] = useState<boolean>(false)
   const [activeTab, setActiveTab] = useState<string>("engine")
   const [tiresError, setTiresError] = useState<boolean>(false)
+  const [activeTabSection, setActiveTabSection] = useState<string>("calculator")
 
   // Submission form states
   const [selectedConfigIndex, setSelectedConfigIndex] = useState<number | null>(null)
@@ -53,7 +54,6 @@ export default function TrackClassCalculator() {
   const [driverEmail, setDriverEmail] = useState<string>("")
   const [carNumber, setCarNumber] = useState<string>("")
   const [team, setTeam] = useState<string>("")
-  const [effectiveDate, setEffectiveDate] = useState<string>("")
   const [comments, setComments] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [submissionSuccess, setSubmissionSuccess] = useState<boolean>(false)
@@ -184,6 +184,28 @@ export default function TrackClassCalculator() {
     setShowResults(true)
   }
 
+  // Reset all selections
+  const resetForm = () => {
+    setMake("")
+    setModel("")
+    setBaseClass("")
+    setSelectedMods({
+      engine: [],
+      drivetrain: [],
+      suspension: [],
+      chassis: [],
+      aero: [],
+      tires: [],
+      weight: [],
+    })
+    setBaseClassPoints(0)
+    setModificationPoints(0)
+    setTotalPoints(0)
+    setFinalClass("")
+    setShowResults(false)
+    setTiresError(false)
+  }
+
   // Save current configuration
   const saveConfiguration = () => {
     const timestamp = new Date().toISOString()
@@ -210,6 +232,9 @@ export default function TrackClassCalculator() {
         title: "Configuration Saved",
         description: `Your ${make} ${model} configuration has been saved successfully.`,
       })
+
+      // Reset form after saving
+      resetForm()
     } catch (error) {
       console.error("Error saving to localStorage:", error)
       toast({
@@ -230,28 +255,6 @@ export default function TrackClassCalculator() {
     }
   }, [])
 
-  // Reset all selections
-  const resetForm = () => {
-    setMake("")
-    setModel("")
-    setBaseClass("")
-    setSelectedMods({
-      engine: [],
-      drivetrain: [],
-      suspension: [],
-      chassis: [],
-      aero: [],
-      tires: [],
-      weight: [],
-    })
-    setBaseClassPoints(0)
-    setModificationPoints(0)
-    setTotalPoints(0)
-    setFinalClass("")
-    setShowResults(false)
-    setTiresError(false)
-  }
-
   // Load a saved configuration
   const loadConfiguration = (config: any) => {
     setMake(config.make)
@@ -264,6 +267,9 @@ export default function TrackClassCalculator() {
     setFinalClass(config.finalClass)
     setShowResults(true)
     setTiresError(false)
+
+    // Switch to calculator tab
+    setActiveTabSection("calculator")
   }
 
   // Get class color based on class name
@@ -283,6 +289,11 @@ export default function TrackClassCalculator() {
   // Handle tab change
   const handleTabChange = (value: string) => {
     setActiveTab(value)
+  }
+
+  // Handle main tab section change
+  const handleTabSectionChange = (value: string) => {
+    setActiveTabSection(value)
   }
 
   // Get special indicators explanation
@@ -327,7 +338,7 @@ export default function TrackClassCalculator() {
       return
     }
 
-    if (!firstName || !lastName || !driverEmail || !carNumber || !effectiveDate) {
+    if (!firstName || !lastName || !driverEmail || !carNumber) {
       toast({
         variant: "destructive",
         title: "Missing information",
@@ -349,16 +360,17 @@ export default function TrackClassCalculator() {
       const formData = new FormData()
 
       // Map form fields to the correct entry IDs from your Google Form
-      formData.append("entry.258378709", effectiveDate) // Effective Date
+      formData.append("entry.258378709", new Date().toISOString().split("T")[0]) // Current date for Effective Date
       formData.append("entry.163721629", fullName) // Driver Name (combined)
       formData.append("entry.292301949", `${config.make} ${config.model}`) // Vehicle Make/Model
       formData.append("entry.1339041663", carNumber) // Car Number
       formData.append("entry.422981728", driverEmail) // Email Address
       formData.append("entry.1491829505", team || "N/A") // Team
-      formData.append("entry.2081807962", config.baseClass) // Base Class
+      formData.append("entry.2081807962", cleanBaseClass(config.baseClass)) // Base Class (without special indicators)
       formData.append("entry.1533485464", config.finalClass) // Final Class
       formData.append("entry.245375180", config.totalPoints.toString()) // Total Points
-      formData.append("entry.555215744", formatModificationsForSubmission(config.mods) + "\n\n" + (comments || "")) // Modifications and Comments
+      formData.append("entry.555215744", formatModificationsForSubmission(config.mods)) // Modifications only
+      formData.append("entry.1222291435", comments || "") // Comments in separate field
 
       // Submit to the Google Form
       const formId = "1FAIpQLSfOULSPEv-xkaSdyK_sMcBfM1O3kqFah8BgpfJQbatlPffKFA"
@@ -371,7 +383,7 @@ export default function TrackClassCalculator() {
       setSubmissionSuccess(true)
       toast({
         title: "Submission successful",
-        description: "Your configuration has been submitted successfully to LightSpeed Time Trial.",
+        description: "Your configuration has been submitted successfully to LightSpeed TimeTrial Database.",
       })
 
       // Reset form fields
@@ -380,7 +392,6 @@ export default function TrackClassCalculator() {
       setDriverEmail("")
       setCarNumber("")
       setTeam("")
-      setEffectiveDate("")
       setComments("")
       setSelectedConfigIndex(null)
     } catch (error) {
@@ -397,16 +408,22 @@ export default function TrackClassCalculator() {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="calculator" className="w-full">
-        <TabsList className={`grid w-full ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
-          <TabsTrigger value="calculator">Calculator</TabsTrigger>
-          <TabsTrigger value="saved">Saved Configurations</TabsTrigger>
-          <TabsTrigger value="submit">Submit Configuration</TabsTrigger>
+      <Tabs value={activeTabSection} onValueChange={handleTabSectionChange} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 bg-black border border-[#fec802]/30">
+          <TabsTrigger value="calculator" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
+            Calculator
+          </TabsTrigger>
+          <TabsTrigger value="saved" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
+            Saved
+          </TabsTrigger>
+          <TabsTrigger value="submit" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
+            Submit
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="calculator" className="space-y-6">
-          <Card>
-            <CardHeader className="border-b border-[#fec802]/20">
+        <TabsContent value="calculator" className="space-y-6 mt-4">
+          <Card className="border-[#fec802]/30 bg-black">
+            <CardHeader className="border-b border-[#fec802]/30">
               <CardTitle className="flex items-center gap-2">
                 <Car className="h-5 w-5 text-[#fec802]" />
                 Vehicle Selection
@@ -455,7 +472,9 @@ export default function TrackClassCalculator() {
                   <AlertDescription>
                     <div className="flex items-center gap-2">
                       Your vehicle's base class is:
-                      <Badge className={`${getClassColor(cleanBaseClass(baseClass))} text-white`}>{baseClass}</Badge>
+                      <Badge className={`${getClassColor(cleanBaseClass(baseClass))} text-white`}>
+                        {cleanBaseClass(baseClass)}
+                      </Badge>
                     </div>
 
                     {getSpecialIndicatorsExplanation() && (
@@ -476,8 +495,8 @@ export default function TrackClassCalculator() {
           </Card>
 
           {baseClass && (
-            <Card>
-              <CardHeader className="border-b border-[#fec802]/20">
+            <Card className="border-[#fec802]/30 bg-black">
+              <CardHeader className="border-b border-[#fec802]/30">
                 <CardTitle>Modifications</CardTitle>
                 <CardDescription>
                   Select all modifications that apply to your vehicle
@@ -486,20 +505,55 @@ export default function TrackClassCalculator() {
               </CardHeader>
               <CardContent className="pt-6">
                 <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                  <TabsList className={`grid ${isMobile ? "grid-cols-4 gap-1" : "grid-cols-7"}`}>
-                    <TabsTrigger value="engine">Engine</TabsTrigger>
-                    <TabsTrigger value="drivetrain">Drivetrain</TabsTrigger>
-                    <TabsTrigger value="suspension">Suspension</TabsTrigger>
-                    <TabsTrigger value="chassis">Chassis</TabsTrigger>
-                    <TabsTrigger value="aero">Aero</TabsTrigger>
-                    <TabsTrigger value="tires" className={tiresError ? "text-red-400 border-red-400" : ""}>
-                      Tires*
-                    </TabsTrigger>
-                    <TabsTrigger value="weight">Weight</TabsTrigger>
-                  </TabsList>
+                  <ScrollArea className="w-full">
+                    <TabsList className="inline-flex w-auto bg-black border border-[#fec802]/30">
+                      <TabsTrigger
+                        value="engine"
+                        className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                      >
+                        Engine
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="drivetrain"
+                        className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                      >
+                        Drivetrain
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="suspension"
+                        className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                      >
+                        Suspension
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="chassis"
+                        className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                      >
+                        Chassis
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="aero"
+                        className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                      >
+                        Aero
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="tires"
+                        className={`data-[state=active]:bg-[#fec802] data-[state=active]:text-black ${tiresError ? "text-red-400 border-red-400" : ""}`}
+                      >
+                        Tires*
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="weight"
+                        className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                      >
+                        Weight
+                      </TabsTrigger>
+                    </TabsList>
+                  </ScrollArea>
 
                   {Object.entries(trackConfig.scoreLookupTable).map(([category, items]) => (
-                    <TabsContent key={category} value={category} className="space-y-4">
+                    <TabsContent key={category} value={category} className="space-y-4 mt-4">
                       {category === "tires" && (
                         <Alert variant={tiresError ? "destructive" : "default"} className="mb-4">
                           <AlertCircle className="h-4 w-4" />
@@ -560,24 +614,24 @@ export default function TrackClassCalculator() {
           )}
 
           {showResults && (
-            <Card>
-              <CardHeader className="border-b border-[#fec802]/20">
+            <Card className="border-[#fec802]/30 bg-black">
+              <CardHeader className="border-b border-[#fec802]/30">
                 <CardTitle>Results</CardTitle>
                 <CardDescription>Your vehicle's classification based on modifications</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-gray-800 rounded-lg text-center">
+                  <div className="p-4 bg-black border border-[#fec802]/30 rounded-lg text-center">
                     <p className="text-sm text-gray-400">Base Class</p>
                     <Badge className={`${getClassColor(cleanBaseClass(baseClass))} text-white text-lg py-1 px-3 mt-1`}>
-                      {baseClass}
+                      {cleanBaseClass(baseClass)}
                     </Badge>
                     {baseClassPoints > 0 && (
                       <p className="text-xs text-gray-400 mt-1">+{baseClassPoints} points from indicators</p>
                     )}
                   </div>
 
-                  <div className="p-4 bg-gray-800 rounded-lg text-center">
+                  <div className="p-4 bg-black border border-[#fec802]/30 rounded-lg text-center">
                     <p className="text-sm text-gray-400">Modification Points</p>
                     <div className="flex flex-col items-center justify-center mt-1">
                       <p className="text-2xl font-bold">{totalPoints}</p>
@@ -589,7 +643,7 @@ export default function TrackClassCalculator() {
                     </div>
                   </div>
 
-                  <div className="p-4 bg-gray-800 rounded-lg text-center">
+                  <div className="p-4 bg-black border border-[#fec802]/30 rounded-lg text-center">
                     <p className="text-sm text-gray-400">Final Class</p>
                     <Badge className={`${getClassColor(finalClass)} text-white text-lg py-1 px-3 mt-1`}>
                       {finalClass}
@@ -597,15 +651,15 @@ export default function TrackClassCalculator() {
                   </div>
                 </div>
 
-                <Alert className="bg-gray-800 border-gray-700">
-                  <Info className="h-4 w-4" />
+                <Alert className="bg-black border-[#fec802]/30">
+                  <Info className="h-4 w-4 text-[#fec802]" />
                   <AlertTitle>Classification Summary</AlertTitle>
                   <AlertDescription>
                     <p>
                       Your {make} {model} has been classified as <strong>{finalClass}</strong> based on your
                       modifications.
                     </p>
-                    {baseClass !== finalClass && (
+                    {cleanBaseClass(baseClass) !== finalClass && (
                       <p className="mt-1">
                         Your vehicle moved up from {cleanBaseClass(baseClass)} to {finalClass} due to {totalPoints}{" "}
                         total points
@@ -625,9 +679,9 @@ export default function TrackClassCalculator() {
           )}
         </TabsContent>
 
-        <TabsContent value="saved">
-          <Card>
-            <CardHeader className="border-b border-[#fec802]/20">
+        <TabsContent value="saved" className="mt-4">
+          <Card className="border-[#fec802]/30 bg-black">
+            <CardHeader className="border-b border-[#fec802]/30">
               <CardTitle>Saved Configurations</CardTitle>
               <CardDescription>Your previously saved vehicle configurations</CardDescription>
             </CardHeader>
@@ -641,7 +695,7 @@ export default function TrackClassCalculator() {
                 <ScrollArea className={`${isMobile ? "h-[350px]" : "h-[400px]"}`}>
                   <div className="space-y-4">
                     {savedConfigs.map((config, index) => (
-                      <div key={index} className="p-4 bg-gray-800 rounded-lg">
+                      <div key={index} className="p-4 bg-black border border-[#fec802]/30 rounded-lg">
                         <div className={`flex ${isMobile ? "flex-col" : "justify-between"} items-start`}>
                           <div>
                             <h3 className="font-medium">
@@ -654,7 +708,7 @@ export default function TrackClassCalculator() {
                           </div>
                           <div className={`flex gap-2 ${isMobile ? "mt-2" : ""}`}>
                             <Badge className={`${getClassColor(cleanBaseClass(config.baseClass))} text-white`}>
-                              Base: {config.baseClass}
+                              Base: {cleanBaseClass(config.baseClass)}
                             </Badge>
                             <Badge className={`${getClassColor(config.finalClass)} text-white`}>
                               Final: {config.finalClass}
@@ -681,9 +735,9 @@ export default function TrackClassCalculator() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="submit">
-          <Card>
-            <CardHeader className="border-b border-[#fec802]/20">
+        <TabsContent value="submit" className="mt-4">
+          <Card className="border-[#fec802]/30 bg-black">
+            <CardHeader className="border-b border-[#fec802]/30">
               <CardTitle>Submit Configuration</CardTitle>
               <CardDescription>
                 Submit your vehicle configuration for event registration or technical inspection
@@ -694,7 +748,7 @@ export default function TrackClassCalculator() {
                 <div className="text-center py-8">
                   <div className="bg-green-900/20 text-green-400 p-4 rounded-lg mb-4">
                     <h3 className="text-lg font-medium">Submission Successful!</h3>
-                    <p>Your configuration has been submitted successfully to LightSpeed Time Trial.</p>
+                    <p>Your configuration has been submitted successfully to LightSpeed TimeTrial Database.</p>
                     <p className="text-sm mt-2">Submission time: {new Date().toLocaleString()}</p>
                   </div>
                   <Button
@@ -719,7 +773,10 @@ export default function TrackClassCalculator() {
                         onValueChange={(value) => setSelectedConfigIndex(Number.parseInt(value))}
                       >
                         {savedConfigs.map((config, index) => (
-                          <div key={index} className="flex items-start space-x-2 p-4 border rounded-lg border-gray-700">
+                          <div
+                            key={index}
+                            className="flex items-start space-x-2 p-4 border rounded-lg border-[#fec802]/30 bg-black"
+                          >
                             <RadioGroupItem value={index.toString()} id={`config-${index}`} />
                             <div className="grid gap-1.5 leading-none w-full">
                               <Label htmlFor={`config-${index}`} className="text-base font-medium">
@@ -732,7 +789,7 @@ export default function TrackClassCalculator() {
                                 </div>
                                 <div className={`flex gap-2 ${isMobile ? "mt-1" : ""}`}>
                                   <Badge className={`${getClassColor(cleanBaseClass(config.baseClass))} text-white`}>
-                                    Base: {config.baseClass}
+                                    Base: {cleanBaseClass(config.baseClass)}
                                   </Badge>
                                   <Badge className={`${getClassColor(config.finalClass)} text-white`}>
                                     Final: {config.finalClass}
@@ -750,6 +807,13 @@ export default function TrackClassCalculator() {
 
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium">2. Driver Information</h3>
+                    <Alert className="mb-4 bg-[#fec802]/10 border-[#fec802]/20">
+                      <Info className="h-4 w-4 text-[#fec802]" />
+                      <AlertTitle>Important Note</AlertTitle>
+                      <AlertDescription>
+                        The latest submission will be used to determine your vehicle's classification.
+                      </AlertDescription>
+                    </Alert>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="first-name">First Name*</Label>
@@ -801,15 +865,13 @@ export default function TrackClassCalculator() {
                           required
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="effective-date">Effective Date*</Label>
-                        <Input
-                          id="effective-date"
-                          type="date"
-                          value={effectiveDate}
-                          onChange={(e) => setEffectiveDate(e.target.value)}
-                          required
-                        />
+                      <div className="space-y-2 flex items-end">
+                        <a
+                          href="mailto:oguo@lightspeedclub.com"
+                          className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-[#fec802] text-black hover:bg-[#fec802]/80 h-10 px-4 py-2 w-full"
+                        >
+                          Email TimeTrial Director
+                        </a>
                       </div>
                     </div>
                   </div>
@@ -825,8 +887,8 @@ export default function TrackClassCalculator() {
                     />
                   </div>
 
-                  <Alert>
-                    <Info className="h-4 w-4" />
+                  <Alert className="bg-black border-[#fec802]/30">
+                    <Info className="h-4 w-4 text-[#fec802]" />
                     <AlertTitle>Submission Information</AlertTitle>
                     <AlertDescription>
                       Your configuration details will be submitted for review. Make sure all information is accurate
