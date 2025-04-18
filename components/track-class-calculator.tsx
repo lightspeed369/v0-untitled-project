@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { AlertCircle, Info, Save, Send } from "lucide-react"
+import { AlertCircle, Car, Info, Save, Send } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { trackConfig } from "@/lib/track-config"
 import { toast } from "@/components/ui/use-toast"
@@ -338,33 +338,27 @@ export default function TrackClassCalculator() {
       const config = savedConfigs[selectedConfigIndex]
       const timestamp = new Date().toISOString()
 
-      // Format the data for Google Form submission
+      // Format the data for Google Form submission using the exact field IDs from your form
       const formData = new FormData()
 
-      // Add timestamp to the form data
-      formData.append("entry.timestamp", timestamp)
-      formData.append("entry.123456789", driverName) // Replace with actual form field IDs
-      formData.append("entry.234567890", driverEmail)
-      formData.append("entry.345678901", carNumber)
-      formData.append("entry.456789012", effectiveDate)
-      formData.append("entry.567890123", `${config.make} ${config.model}`)
-      formData.append("entry.678901234", config.baseClass)
-      formData.append("entry.789012345", config.finalClass)
-      formData.append("entry.890123456", config.totalPoints.toString())
-      formData.append("entry.901234567", formatModificationsForSubmission(config.mods))
-      formData.append("entry.012345678", comments)
+      // Map form fields to the correct entry IDs from your Google Form
+      formData.append("entry.258378709", effectiveDate) // Effective Date
+      formData.append("entry.163721629", driverName) // Driver Name
+      formData.append("entry.292301949", `${config.make} ${config.model}`) // Vehicle Make/Model
+      formData.append("entry.1339041663", carNumber) // Car Number
+      formData.append("entry.422981728", driverEmail) // Email Address
+      formData.append("entry.1491829505", team || "N/A") // Team
+      formData.append("entry.2081807962", config.baseClass) // Base Class
+      formData.append("entry.1533485464", config.finalClass) // Final Class
+      formData.append("entry.245375180", config.totalPoints.toString()) // Total Points
+      formData.append("entry.555215744", formatModificationsForSubmission(config.mods) + "\n\n" + (comments || "")) // Modifications and Comments
 
-      // Add team if provided
-      if (team) {
-        formData.append("entry.123123123", team)
-      }
-
-      // Submit to the Google Sheet
-      // Note: This URL needs to be the form submission URL, not the spreadsheet URL directly
-      const response = await fetch("https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse", {
+      // Submit to the Google Form
+      const formId = "1FAIpQLSfOULSPEv-xkaSdyK_sMcBfM1O3kqFah8BgpfJQbatlPffKFA"
+      const response = await fetch(`https://docs.google.com/forms/d/e/${formId}/formResponse`, {
         method: "POST",
         body: formData,
-        mode: "no-cors",
+        mode: "no-cors", // Required for Google Forms
       })
 
       setSubmissionSuccess(true)
@@ -405,11 +399,11 @@ export default function TrackClassCalculator() {
         <TabsContent value="calculator" className="space-y-6">
           <Card>
             <CardHeader className="border-b border-[#fec802]/20">
-              <CardTitle>LightSpeed Time Trial Classification Calculator</CardTitle>
-              <CardDescription>
-                Select all modifications that apply to your vehicle
-                <span className="text-red-400 ml-1">(tire selection is required)</span>
-              </CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Car className="h-5 w-5 text-[#fec802]" />
+                Vehicle Selection
+              </CardTitle>
+              <CardDescription>Select your vehicle make and model to determine the base class</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -725,7 +719,8 @@ export default function TrackClassCalculator() {
                               </Label>
                               <div className="flex justify-between items-center mt-2">
                                 <div className="text-sm text-gray-400">
-                                  {new Date(config.timestamp).toLocaleDateString()}
+                                  {new Date(config.timestamp).toLocaleDateString()} at{" "}
+                                  {new Date(config.timestamp).toLocaleTimeString()}
                                 </div>
                                 <div className="flex gap-2">
                                   <Badge className={`${getClassColor(cleanBaseClass(config.baseClass))} text-white`}>
