@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -18,12 +18,12 @@ import { trackConfig } from "@/lib/track-config"
 import { toast } from "@/components/ui/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useMobile } from "@/hooks/use-mobile"
 
 export default function TrackClassCalculator() {
   const isMobile = useMobile()
+  const resultsRef = useRef<HTMLDivElement>(null)
 
   const [make, setMake] = useState<string>("")
   const [model, setModel] = useState<string>("")
@@ -54,7 +54,6 @@ export default function TrackClassCalculator() {
   const [driverEmail, setDriverEmail] = useState<string>("")
   const [carNumber, setCarNumber] = useState<string>("")
   const [team, setTeam] = useState<string>("")
-  const [comments, setComments] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [submissionSuccess, setSubmissionSuccess] = useState<boolean>(false)
 
@@ -182,6 +181,13 @@ export default function TrackClassCalculator() {
     setTotalPoints(total)
     setFinalClass(calculateFinalClass(baseClass, total))
     setShowResults(true)
+
+    // Scroll to results after a short delay to allow rendering
+    setTimeout(() => {
+      if (resultsRef.current) {
+        resultsRef.current.scrollIntoView({ behavior: "smooth" })
+      }
+    }, 100)
   }
 
   // Reset all selections
@@ -370,7 +376,6 @@ export default function TrackClassCalculator() {
       formData.append("entry.1533485464", config.finalClass) // Final Class
       formData.append("entry.245375180", config.totalPoints.toString()) // Total Points
       formData.append("entry.555215744", formatModificationsForSubmission(config.mods)) // Modifications only
-      formData.append("entry.1222291435", comments || "") // Comments in separate field
 
       // Submit to the Google Form
       const formId = "1FAIpQLSfOULSPEv-xkaSdyK_sMcBfM1O3kqFah8BgpfJQbatlPffKFA"
@@ -392,7 +397,6 @@ export default function TrackClassCalculator() {
       setDriverEmail("")
       setCarNumber("")
       setTeam("")
-      setComments("")
       setSelectedConfigIndex(null)
     } catch (error) {
       console.error("Error submitting form:", error)
@@ -505,52 +509,76 @@ export default function TrackClassCalculator() {
               </CardHeader>
               <CardContent className="pt-6">
                 <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                  <ScrollArea className="w-full">
-                    <TabsList className="inline-flex w-auto bg-black border border-[#fec802]/30">
-                      <TabsTrigger
-                        value="engine"
-                        className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                      >
-                        Engine
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="drivetrain"
-                        className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                      >
-                        Drivetrain
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="suspension"
-                        className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                      >
-                        Suspension
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="chassis"
-                        className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                      >
-                        Chassis
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="aero"
-                        className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                      >
-                        Aero
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="tires"
-                        className={`data-[state=active]:bg-[#fec802] data-[state=active]:text-black ${tiresError ? "text-red-400 border-red-400" : ""}`}
-                      >
-                        Tires*
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="weight"
-                        className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                      >
-                        Weight
-                      </TabsTrigger>
-                    </TabsList>
-                  </ScrollArea>
+                  {/* Mobile-optimized tab list */}
+                  {isMobile ? (
+                    <div className="mb-4">
+                      <Select value={activeTab} onValueChange={handleTabChange}>
+                        <SelectTrigger className="bg-black border-[#fec802]/30">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="engine">Engine</SelectItem>
+                          <SelectItem value="drivetrain">Drivetrain</SelectItem>
+                          <SelectItem value="suspension">Suspension</SelectItem>
+                          <SelectItem value="chassis">Chassis</SelectItem>
+                          <SelectItem value="aero">Aero</SelectItem>
+                          <SelectItem value="tires" className={tiresError ? "text-red-400" : ""}>
+                            Tires*
+                          </SelectItem>
+                          <SelectItem value="weight">Weight</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <ScrollArea className="w-full">
+                      <TabsList className="inline-flex w-auto bg-black border border-[#fec802]/30">
+                        <TabsTrigger
+                          value="engine"
+                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                        >
+                          Engine
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="drivetrain"
+                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                        >
+                          Drivetrain
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="suspension"
+                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                        >
+                          Suspension
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="chassis"
+                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                        >
+                          Chassis
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="aero"
+                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                        >
+                          Aero
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="tires"
+                          className={`data-[state=active]:bg-[#fec802] data-[state=active]:text-black ${
+                            tiresError ? "text-red-400 border-red-400" : ""
+                          }`}
+                        >
+                          Tires*
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="weight"
+                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                        >
+                          Weight
+                        </TabsTrigger>
+                      </TabsList>
+                    </ScrollArea>
+                  )}
 
                   {Object.entries(trackConfig.scoreLookupTable).map(([category, items]) => (
                     <TabsContent key={category} value={category} className="space-y-4 mt-4">
@@ -614,7 +642,7 @@ export default function TrackClassCalculator() {
           )}
 
           {showResults && (
-            <Card className="border-[#fec802]/30 bg-black">
+            <Card className="border-[#fec802]/30 bg-black" ref={resultsRef}>
               <CardHeader className="border-b border-[#fec802]/30">
                 <CardTitle>Results</CardTitle>
                 <CardDescription>Your vehicle's classification based on modifications</CardDescription>
@@ -868,33 +896,13 @@ export default function TrackClassCalculator() {
                       <div className="space-y-2 flex items-end">
                         <a
                           href="mailto:oguo@lightspeedclub.com"
-                          className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-[#fec802] text-black hover:bg-[#fec802]/80 h-10 px-4 py-2 w-full"
+                          className="inline-flex items-center justify-content-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-[#fec802] text-black hover:bg-[#fec802]/80 h-10 px-4 py-2 w-full"
                         >
                           Email TimeTrial Director
                         </a>
                       </div>
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="comments">Additional Comments</Label>
-                    <Textarea
-                      id="comments"
-                      value={comments}
-                      onChange={(e) => setComments(e.target.value)}
-                      placeholder="Any additional information about your vehicle or modifications"
-                      className="min-h-[100px]"
-                    />
-                  </div>
-
-                  <Alert className="bg-black border-[#fec802]/30">
-                    <Info className="h-4 w-4 text-[#fec802]" />
-                    <AlertTitle>Submission Information</AlertTitle>
-                    <AlertDescription>
-                      Your configuration details will be submitted for review. Make sure all information is accurate
-                      before submitting.
-                    </AlertDescription>
-                  </Alert>
 
                   <Button
                     type="submit"
