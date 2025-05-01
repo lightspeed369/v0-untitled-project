@@ -14,6 +14,7 @@ import { toast } from "@/components/ui/use-toast"
 import { Check, Edit, Lock, Save, X } from "lucide-react"
 import {
   getCurrentConfig,
+  saveConfigToServer,
   saveConfigToStorage,
   createModString,
   parseBaseClass,
@@ -43,11 +44,28 @@ export default function AdminPage() {
   const [editingMod, setEditingMod] = useState<string | null>(null)
   const [editModName, setEditModName] = useState("")
   const [editModPoints, setEditModPoints] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
 
   // Load configuration on component mount
   useEffect(() => {
-    const currentConfig = getCurrentConfig()
-    setConfig(currentConfig)
+    const loadConfig = async () => {
+      setIsLoading(true)
+      try {
+        const currentConfig = await getCurrentConfig()
+        setConfig(currentConfig)
+      } catch (error) {
+        console.error("Error loading configuration:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load configuration. Please try again.",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadConfig()
   }, [])
 
   // Handle authentication
@@ -313,7 +331,6 @@ export default function AdminPage() {
     )
 
     // Update the score lookup table
-    const points = updatedConfig.scoreLookupTable[selectedCategory][editingMod]
     delete updatedConfig.scoreLookupTable[selectedCategory][editingMod]
     updatedConfig.scoreLookupTable[selectedCategory][newModString] = editModPoints
 
@@ -365,9 +382,16 @@ export default function AdminPage() {
   }
 
   // Handle saving the configuration
-  const handleSaveConfig = () => {
-    const success = saveConfigToStorage(config)
-    if (success) {
+  const handleSaveConfig = async () => {
+    setSaveSuccess(false)
+
+    // First, save to the server
+    const serverSuccess = await saveConfigToServer(config)
+
+    // Also save to localStorage as a backup
+    const localSuccess = saveConfigToStorage(config)
+
+    if (serverSuccess) {
       // Broadcast the configuration change
       broadcastConfigChange(config)
 
@@ -375,13 +399,15 @@ export default function AdminPage() {
       setTimeout(() => setSaveSuccess(false), 3000)
       toast({
         title: "Configuration saved",
-        description: "Your changes have been saved successfully and will be reflected immediately.",
+        description: "Your changes have been saved successfully and will be reflected for all users.",
       })
     } else {
       toast({
         variant: "destructive",
-        title: "Save failed",
-        description: "There was an error saving your configuration. Please try again.",
+        title: "Server save failed",
+        description: localSuccess
+          ? "Changes were saved locally but failed to save to the server. Only you will see these changes."
+          : "There was an error saving your configuration. Please try again.",
       })
     }
   }
@@ -401,8 +427,28 @@ export default function AdminPage() {
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#fec802] mx-auto"></div>
+          <p className="mt-4">Loading configuration...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!config) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertTitle>Error Loading Configuration</AlertTitle>
+          <AlertDescription>
+            Failed to load the configuration data. Please refresh the page or try again later.
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
   }
 
   return (

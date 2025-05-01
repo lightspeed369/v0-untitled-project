@@ -2,13 +2,46 @@
 
 import { trackConfig } from "./track-config"
 
-// Function to save configuration to localStorage
+// Function to save configuration to the server
+export const saveConfigToServer = async (config: any) => {
+  try {
+    const response = await fetch("/api/config", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(config),
+    })
+
+    const data = await response.json()
+    return data.success
+  } catch (error) {
+    console.error("Error saving config to server:", error)
+    return false
+  }
+}
+
+// Function to load configuration from the server
+export const loadConfigFromServer = async () => {
+  try {
+    const response = await fetch("/api/config")
+    if (!response.ok) {
+      throw new Error("Failed to fetch configuration")
+    }
+    return await response.json()
+  } catch (error) {
+    console.error("Error loading config from server:", error)
+    return null
+  }
+}
+
+// Function to save configuration to localStorage (as backup)
 export const saveConfigToStorage = (config: any) => {
   try {
     localStorage.setItem("trackConfig", JSON.stringify(config))
     return true
   } catch (error) {
-    console.error("Error saving config:", error)
+    console.error("Error saving config to localStorage:", error)
     return false
   }
 }
@@ -22,15 +55,23 @@ export const loadConfigFromStorage = () => {
     }
     return null
   } catch (error) {
-    console.error("Error loading config:", error)
+    console.error("Error loading config from localStorage:", error)
     return null
   }
 }
 
-// Function to get the current configuration (from localStorage or default)
-export const getCurrentConfig = () => {
-  const savedConfig = loadConfigFromStorage()
-  return savedConfig || trackConfig
+// Function to get the current configuration (from server or default)
+export const getCurrentConfig = async () => {
+  const serverConfig = await loadConfigFromServer()
+  if (serverConfig) {
+    // Save to localStorage as a backup
+    saveConfigToStorage(serverConfig)
+    return serverConfig
+  }
+
+  // If server fetch fails, try localStorage
+  const localConfig = loadConfigFromStorage()
+  return localConfig || trackConfig
 }
 
 // Function to extract points from a modification string

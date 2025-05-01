@@ -26,6 +26,7 @@ export default function TrackClassCalculator() {
   const isMobile = useMobile()
   const resultsRef = useRef<HTMLDivElement>(null)
   const [config, setConfig] = useState<any>(trackConfig)
+  const [isLoading, setIsLoading] = useState(true)
 
   const [make, setMake] = useState<string>("")
   const [model, setModel] = useState<string>("")
@@ -62,8 +63,25 @@ export default function TrackClassCalculator() {
 
   // Load configuration on component mount
   useEffect(() => {
-    const currentConfig = getCurrentConfig()
-    setConfig(currentConfig)
+    const loadConfig = async () => {
+      setIsLoading(true)
+      try {
+        const currentConfig = await getCurrentConfig()
+        setConfig(currentConfig)
+      } catch (error) {
+        console.error("Error loading configuration:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load configuration. Using default configuration.",
+        })
+        setConfig(trackConfig) // Fallback to default config
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadConfig()
 
     // Listen for configuration changes
     const handleConfigUpdate = (event: CustomEvent) => {
@@ -76,8 +94,29 @@ export default function TrackClassCalculator() {
 
     window.addEventListener("configUpdated", handleConfigUpdate as EventListener)
 
+    // Poll for configuration updates every 5 minutes
+    const intervalId = setInterval(
+      async () => {
+        try {
+          const updatedConfig = await getCurrentConfig()
+          // Only update if the config has actually changed
+          if (JSON.stringify(updatedConfig) !== JSON.stringify(config)) {
+            setConfig(updatedConfig)
+            toast({
+              title: "Configuration Updated",
+              description: "The configuration has been updated.",
+            })
+          }
+        } catch (error) {
+          console.error("Error checking for config updates:", error)
+        }
+      },
+      5 * 60 * 1000,
+    ) // 5 minutes
+
     return () => {
       window.removeEventListener("configUpdated", handleConfigUpdate as EventListener)
+      clearInterval(intervalId)
     }
   }, [])
 
@@ -446,6 +485,17 @@ export default function TrackClassCalculator() {
   const formatCategoryName = (category: string) => {
     if (category === "weight-reduction") return "Weight Reduction"
     return category.charAt(0).toUpperCase() + category.slice(1)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#fec802] mx-auto"></div>
+          <p className="mt-4">Loading calculator...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
