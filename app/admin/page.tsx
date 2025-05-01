@@ -68,6 +68,39 @@ export default function AdminPage() {
     loadConfig()
   }, [])
 
+  // Add this function to the admin page component
+  const checkServerStatus = async () => {
+    try {
+      const response = await fetch("/api/config/status")
+      if (!response.ok) {
+        throw new Error(`Failed to fetch status: ${response.status} ${response.statusText}`)
+      }
+      const status = await response.json()
+
+      toast({
+        title: "Server Status",
+        description: (
+          <div className="space-y-2 mt-2">
+            <p>Data directory exists: {status.dataDirectoryExists ? "✅" : "❌"}</p>
+            <p>Data directory writable: {status.dataDirectoryWritable ? "✅" : "❌"}</p>
+            <p>Config file exists: {status.configFileExists ? "✅" : "❌"}</p>
+            <p>Config file readable: {status.configFileReadable ? "✅" : "❌"}</p>
+            <p>Config file writable: {status.configFileWritable ? "✅" : "❌"}</p>
+            <p>Server time: {new Date(status.serverTime).toLocaleString()}</p>
+          </div>
+        ),
+        duration: 10000,
+      })
+    } catch (error) {
+      console.error("Error checking server status:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to check server status: ${error}`,
+      })
+    }
+  }
+
   // Handle authentication
   const handleAuthenticate = () => {
     // In a real application, you would use a secure authentication method
@@ -386,12 +419,12 @@ export default function AdminPage() {
     setSaveSuccess(false)
 
     // First, save to the server
-    const serverSuccess = await saveConfigToServer(config)
+    const serverResult = await saveConfigToServer(config)
 
     // Also save to localStorage as a backup
     const localSuccess = saveConfigToStorage(config)
 
-    if (serverSuccess) {
+    if (serverResult.success) {
       // Broadcast the configuration change
       broadcastConfigChange(config)
 
@@ -406,8 +439,8 @@ export default function AdminPage() {
         variant: "destructive",
         title: "Server save failed",
         description: localSuccess
-          ? "Changes were saved locally but failed to save to the server. Only you will see these changes."
-          : "There was an error saving your configuration. Please try again.",
+          ? `Changes were saved locally but failed to save to the server: ${serverResult.error || "Unknown error"}. Only you will see these changes.`
+          : `There was an error saving your configuration: ${serverResult.error || "Unknown error"}. Please try again.`,
       })
     }
   }
@@ -840,7 +873,10 @@ export default function AdminPage() {
       </Card>
 
       {isAuthenticated && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-4">
+          <Button variant="outline" onClick={checkServerStatus}>
+            Check Server Status
+          </Button>
           <Button
             onClick={handleSaveConfig}
             className="bg-[#fec802] hover:bg-[#fec802]/80 text-black"

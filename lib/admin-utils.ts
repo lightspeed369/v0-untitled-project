@@ -14,10 +14,16 @@ export const saveConfigToServer = async (config: any) => {
     })
 
     const data = await response.json()
-    return data.success
+
+    if (!response.ok) {
+      console.error("Server error:", data)
+      return { success: false, error: data.message || "Server error" }
+    }
+
+    return { success: true }
   } catch (error) {
     console.error("Error saving config to server:", error)
-    return false
+    return { success: false, error: String(error) }
   }
 }
 
@@ -26,7 +32,7 @@ export const loadConfigFromServer = async () => {
   try {
     const response = await fetch("/api/config")
     if (!response.ok) {
-      throw new Error("Failed to fetch configuration")
+      throw new Error(`Failed to fetch configuration: ${response.status} ${response.statusText}`)
     }
     return await response.json()
   } catch (error) {
