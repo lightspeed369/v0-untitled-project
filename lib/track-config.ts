@@ -250,11 +250,12 @@ export const trackConfig = {
   tires: [
     "Original OEM equipped tires (0)",
     "140-200TW (2)",
-    "Super 200TW (A052,CRS V2,Hoosier TrackAttack) (3)",
+    "Super 200TW (A052,CRS V2,RE71RS,V730) (3)",
+    "Hoosier TrackAttackPro *Reach out for special pricing (1)",
     "40-100TW (5)",
     "Non DOT Slicks (10)",
   ],
-  weight: [
+  "weight-reduction": [
     "Interior A (Door panel, roof liner, heater core, trim panel) (1)",
     "Interior B (carpet, dashboard) (1)",
     "Interior C (Seats, Belts, Airbag. Excl. Driver bucket seat, Must be FIA Approved) (2)",
@@ -322,11 +323,12 @@ export const trackConfig = {
     tires: {
       "Original OEM equipped tires (0)": 0,
       "140-200TW (2)": 2,
-      "Super 200TW (A052,CRS V2,Hoosier TrackAttack) (3)": 3,
+      "Super 200TW (A052,CRS V2,RE71RS,V730) (3)": 3,
+      "Hoosier TrackAttackPro *Reach out for special pricing (1)": 1,
       "40-100TW (5)": 5,
       "Non DOT Slicks (10)": 10,
     },
-    weight: {
+    "weight-reduction": {
       "Interior A (Door panel, roof liner, heater core, trim panel) (1)": 1,
       "Interior B (carpet, dashboard) (1)": 1,
       "Interior C (Seats, Belts, Airbag. Excl. Driver bucket seat, Must be FIA Approved) (2)": 2,

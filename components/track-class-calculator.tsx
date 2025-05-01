@@ -20,10 +20,12 @@ import { ToastAction } from "@/components/ui/toast"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useMobile } from "@/hooks/use-mobile"
+import { getCurrentConfig } from "@/lib/admin-utils"
 
 export default function TrackClassCalculator() {
   const isMobile = useMobile()
   const resultsRef = useRef<HTMLDivElement>(null)
+  const [config, setConfig] = useState<any>(trackConfig)
 
   const [make, setMake] = useState<string>("")
   const [model, setModel] = useState<string>("")
@@ -35,8 +37,8 @@ export default function TrackClassCalculator() {
     chassis: [],
     aero: [],
     tires: [],
-    weight: [],
-    electronics: [], // Add your new category here
+    "weight-reduction": [],
+    electronics: [],
   })
   const [totalPoints, setTotalPoints] = useState<number>(0)
   const [baseClassPoints, setBaseClassPoints] = useState<number>(0)
@@ -58,19 +60,40 @@ export default function TrackClassCalculator() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [submissionSuccess, setSubmissionSuccess] = useState<boolean>(false)
 
+  // Load configuration on component mount
+  useEffect(() => {
+    const currentConfig = getCurrentConfig()
+    setConfig(currentConfig)
+
+    // Listen for configuration changes
+    const handleConfigUpdate = (event: CustomEvent) => {
+      setConfig(event.detail)
+      toast({
+        title: "Configuration Updated",
+        description: "The configuration has been updated by an administrator.",
+      })
+    }
+
+    window.addEventListener("configUpdated", handleConfigUpdate as EventListener)
+
+    return () => {
+      window.removeEventListener("configUpdated", handleConfigUpdate as EventListener)
+    }
+  }, [])
+
   // Get all available makes
-  const makes = Object.keys(trackConfig.models)
+  const makes = Object.keys(config.models)
 
   // Get models for selected make
   const getModels = (selectedMake: string) => {
     if (!selectedMake) return []
-    return Object.keys(trackConfig.models[selectedMake] || {})
+    return Object.keys(config.models[selectedMake] || {})
   }
 
   // Get base class for selected model
   const getBaseClass = (selectedMake: string, selectedModel: string) => {
     if (!selectedMake || !selectedModel) return ""
-    return trackConfig.models[selectedMake]?.[selectedModel]?.baseClass || ""
+    return config.models[selectedMake]?.[selectedModel]?.baseClass || ""
   }
 
   // Calculate points from special indicators in base class
@@ -128,7 +151,7 @@ export default function TrackClassCalculator() {
     let points = 0
     Object.entries(selectedMods).forEach(([category, items]) => {
       items.forEach((item) => {
-        points += trackConfig.scoreLookupTable[category][item] || 0
+        points += config.scoreLookupTable[category][item] || 0
       })
     })
     return points
@@ -140,7 +163,7 @@ export default function TrackClassCalculator() {
     const cleanedBaseClass = cleanBaseClass(baseClassValue)
 
     // Find the index of the base class in the classes array
-    const baseClassIndex = trackConfig.classes.indexOf(cleanedBaseClass)
+    const baseClassIndex = config.classes.indexOf(cleanedBaseClass)
     if (baseClassIndex === -1) return "Unknown"
 
     // Calculate how many classes to move up
@@ -153,9 +176,9 @@ export default function TrackClassCalculator() {
     else if (totalPoints >= 84) classesToMoveUp = 6
 
     // Calculate new class index (capped at the highest class)
-    const newClassIndex = Math.min(baseClassIndex + classesToMoveUp, trackConfig.classes.length - 1)
+    const newClassIndex = Math.min(baseClassIndex + classesToMoveUp, config.classes.length - 1)
 
-    return trackConfig.classes[newClassIndex]
+    return config.classes[newClassIndex]
   }
 
   // Calculate results
@@ -203,7 +226,7 @@ export default function TrackClassCalculator() {
       chassis: [],
       aero: [],
       tires: [],
-      weight: [],
+      "weight-reduction": [],
       electronics: [],
     })
     setBaseClassPoints(0)
@@ -412,6 +435,19 @@ export default function TrackClassCalculator() {
     }
   }
 
+  // Get modification categories for tabs
+  const getModificationCategories = () => {
+    return Object.keys(config.scoreLookupTable).filter(
+      (category) => category !== "classesScore" && Array.isArray(config[category]),
+    )
+  }
+
+  // Format category name for display
+  const formatCategoryName = (category: string) => {
+    if (category === "weight-reduction") return "Weight Reduction"
+    return category.charAt(0).toUpperCase() + category.slice(1)
+  }
+
   return (
     <div className="space-y-6">
       <Tabs value={activeTabSection} onValueChange={handleTabSectionChange} className="w-full">
@@ -519,77 +555,39 @@ export default function TrackClassCalculator() {
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="engine">Engine</SelectItem>
-                          <SelectItem value="drivetrain">Drivetrain</SelectItem>
-                          <SelectItem value="suspension">Suspension</SelectItem>
-                          <SelectItem value="chassis">Chassis</SelectItem>
-                          <SelectItem value="aero">Aero</SelectItem>
-                          <SelectItem value="tires" className={tiresError ? "text-red-400" : ""}>
-                            Tires*
-                          </SelectItem>
-                          <SelectItem value="weight">Weight</SelectItem>
-                          <SelectItem value="electronics">Electronics</SelectItem>
+                          {getModificationCategories().map((category) => (
+                            <SelectItem
+                              key={category}
+                              value={category}
+                              className={category === "tires" && tiresError ? "text-red-400" : ""}
+                            >
+                              {formatCategoryName(category)}
+                              {category === "tires" ? "*" : ""}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                   ) : (
                     <ScrollArea className="w-full">
                       <TabsList className="inline-flex w-auto bg-black border border-[#fec802]/30">
-                        <TabsTrigger
-                          value="engine"
-                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                        >
-                          Engine
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="drivetrain"
-                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                        >
-                          Drivetrain
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="suspension"
-                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                        >
-                          Suspension
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="chassis"
-                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                        >
-                          Chassis
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="aero"
-                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                        >
-                          Aero
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="tires"
-                          className={`data-[state=active]:bg-[#fec802] data-[state=active]:text-black ${
-                            tiresError ? "text-red-400 border-red-400" : ""
-                          }`}
-                        >
-                          Tires*
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="weight"
-                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                        >
-                          Weight
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="electronics"
-                          className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
-                        >
-                          Electronics
-                        </TabsTrigger>
+                        {getModificationCategories().map((category) => (
+                          <TabsTrigger
+                            key={category}
+                            value={category}
+                            className={`data-[state=active]:bg-[#fec802] data-[state=active]:text-black ${
+                              category === "tires" && tiresError ? "text-red-400 border-red-400" : ""
+                            }`}
+                          >
+                            {formatCategoryName(category)}
+                            {category === "tires" ? "*" : ""}
+                          </TabsTrigger>
+                        ))}
                       </TabsList>
                     </ScrollArea>
                   )}
 
-                  {Object.entries(trackConfig.scoreLookupTable).map(([category, items]) => (
+                  {getModificationCategories().map((category) => (
                     <TabsContent key={category} value={category} className="space-y-4 mt-4">
                       {category === "tires" && (
                         <Alert variant={tiresError ? "destructive" : "default"} className="mb-4">
@@ -603,7 +601,7 @@ export default function TrackClassCalculator() {
                       )}
 
                       <ScrollArea className={`${isMobile ? "h-[250px]" : "h-[300px]"} pr-4`}>
-                        {Object.entries(items).map(([item, points], index) => (
+                        {config[category]?.map((item: string, index: number) => (
                           <div key={item} className="flex items-start space-x-2 py-2">
                             <Checkbox
                               id={`${category}-${index}`}
@@ -626,7 +624,12 @@ export default function TrackClassCalculator() {
                               >
                                 {/* Extract the full description without the last points part */}
                                 {item.substring(0, item.lastIndexOf("(")).trim()}
-                                <Badge className="ml-2 bg-gray-700">{points > 0 ? `+${points}` : points} points</Badge>
+                                <Badge className="ml-2 bg-gray-700">
+                                  {config.scoreLookupTable[category][item] > 0
+                                    ? `+${config.scoreLookupTable[category][item]}`
+                                    : config.scoreLookupTable[category][item]}{" "}
+                                  points
+                                </Badge>
                               </Label>
                             </div>
                           </div>
