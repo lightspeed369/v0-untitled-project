@@ -250,7 +250,7 @@ export const trackConfig = {
   tires: [
     "Original OEM equipped tires (0)",
     "140-200TW (2)",
-    "Super 200TW (A052,CRS V2,RE71RS,V730) (3)",
+    "Super 200TW (A052,CRS V2,RE71RS) (3)",
     "Hoosier TrackAttackPro *Reach out for special pricing (1)",
     "40-100TW (5)",
     "Non DOT Slicks (10)",
@@ -323,7 +323,7 @@ export const trackConfig = {
     tires: {
       "Original OEM equipped tires (0)": 0,
       "140-200TW (2)": 2,
-      "Super 200TW (A052,CRS V2,RE71RS,V730) (3)": 3,
+      "Super 200TW (A052,CRS V2,RE71RS) (3)": 3,
       "Hoosier TrackAttackPro *Reach out for special pricing (1)": 1,
       "40-100TW (5)": 5,
       "Non DOT Slicks (10)": 10,

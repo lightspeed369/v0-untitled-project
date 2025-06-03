@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useMobile } from "@/hooks/use-mobile"
 import { getCurrentConfig } from "@/lib/admin-utils"
+import Link from "next/link"
 
 export default function TrackClassCalculator() {
   const isMobile = useMobile()
@@ -66,10 +67,12 @@ export default function TrackClassCalculator() {
     const loadConfig = async () => {
       setIsLoading(true)
       try {
+        console.log("Calculator: Loading configuration...")
         const currentConfig = await getCurrentConfig()
+        console.log("Calculator: Loaded config:", currentConfig)
         setConfig(currentConfig)
       } catch (error) {
-        console.error("Error loading configuration:", error)
+        console.error("Calculator: Error loading configuration:", error)
         toast({
           variant: "destructive",
           title: "Error",
@@ -84,7 +87,8 @@ export default function TrackClassCalculator() {
     loadConfig()
 
     // Listen for configuration changes
-    const handleConfigUpdate = (event: CustomEvent) => {
+    const handleConfigUpdate = async (event: CustomEvent) => {
+      console.log("Calculator: Received config update event:", event.detail)
       setConfig(event.detail)
       toast({
         title: "Configuration Updated",
@@ -94,13 +98,15 @@ export default function TrackClassCalculator() {
 
     window.addEventListener("configUpdated", handleConfigUpdate as EventListener)
 
-    // Poll for configuration updates every 5 minutes
+    // Poll for configuration updates every 30 seconds for testing
     const intervalId = setInterval(
       async () => {
         try {
+          console.log("Calculator: Polling for config updates...")
           const updatedConfig = await getCurrentConfig()
           // Only update if the config has actually changed
           if (JSON.stringify(updatedConfig) !== JSON.stringify(config)) {
+            console.log("Calculator: Config changed, updating...")
             setConfig(updatedConfig)
             toast({
               title: "Configuration Updated",
@@ -108,17 +114,17 @@ export default function TrackClassCalculator() {
             })
           }
         } catch (error) {
-          console.error("Error checking for config updates:", error)
+          console.error("Calculator: Error checking for config updates:", error)
         }
       },
-      5 * 60 * 1000,
-    ) // 5 minutes
+      30 * 1000, // 30 seconds for testing
+    )
 
     return () => {
       window.removeEventListener("configUpdated", handleConfigUpdate as EventListener)
       clearInterval(intervalId)
     }
-  }, [])
+  }, [config])
 
   // Get all available makes
   const makes = Object.keys(config.models)
@@ -487,6 +493,30 @@ export default function TrackClassCalculator() {
     return category.charAt(0).toUpperCase() + category.slice(1)
   }
 
+  // Add this function after the other handler functions:
+  const refreshConfiguration = async () => {
+    setIsLoading(true)
+    try {
+      console.log("Manual refresh: Loading configuration...")
+      const currentConfig = await getCurrentConfig()
+      console.log("Manual refresh: Loaded config:", currentConfig)
+      setConfig(currentConfig)
+      toast({
+        title: "Configuration Refreshed",
+        description: "Configuration has been refreshed from the server.",
+      })
+    } catch (error) {
+      console.error("Manual refresh: Error loading configuration:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to refresh configuration.",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -500,6 +530,26 @@ export default function TrackClassCalculator() {
 
   return (
     <div className="space-y-6">
+      {/* Add this button in the main header area, after the title: */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-4xl font-bold text-center mb-2">
+            LightSpeed Time Trial Classification Calculator
+            <span className="text-[#fec802] ml-2">⚡</span>
+          </h1>
+          <p className="text-center text-[#fec802] mb-8">
+            Determine your vehicle's classification based on modifications
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={refreshConfiguration} disabled={isLoading}>
+            {isLoading ? "Refreshing..." : "Refresh Config"}
+          </Button>
+          <Link href="/admin" className="text-[#fec802] hover:text-[#fec802]/80 text-sm">
+            Admin
+          </Link>
+        </div>
+      </div>
       <Tabs value={activeTabSection} onValueChange={handleTabSectionChange} className="w-full">
         <TabsList className="grid w-full grid-cols-3 bg-black border border-[#fec802]/30">
           <TabsTrigger value="calculator" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">

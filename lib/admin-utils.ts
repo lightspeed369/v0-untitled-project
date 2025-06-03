@@ -5,6 +5,8 @@ import { trackConfig } from "./track-config"
 // Function to save configuration to the server
 export const saveConfigToServer = async (config: any) => {
   try {
+    console.log("Saving config to server:", config)
+
     const response = await fetch("/api/config", {
       method: "POST",
       headers: {
@@ -14,13 +16,14 @@ export const saveConfigToServer = async (config: any) => {
     })
 
     const data = await response.json()
+    console.log("Server response:", data)
 
     if (!response.ok) {
       console.error("Server error:", data)
       return { success: false, error: data.message || "Server error" }
     }
 
-    return { success: true }
+    return { success: true, data }
   } catch (error) {
     console.error("Error saving config to server:", error)
     return { success: false, error: String(error) }
@@ -30,11 +33,22 @@ export const saveConfigToServer = async (config: any) => {
 // Function to load configuration from the server
 export const loadConfigFromServer = async () => {
   try {
-    const response = await fetch("/api/config")
+    console.log("Loading config from server...")
+
+    const response = await fetch("/api/config", {
+      cache: "no-store", // Ensure we always get fresh data
+      headers: {
+        "Cache-Control": "no-cache",
+      },
+    })
+
     if (!response.ok) {
       throw new Error(`Failed to fetch configuration: ${response.status} ${response.statusText}`)
     }
-    return await response.json()
+
+    const config = await response.json()
+    console.log("Loaded config from server:", config)
+    return config
   } catch (error) {
     console.error("Error loading config from server:", error)
     return null
@@ -68,16 +82,26 @@ export const loadConfigFromStorage = () => {
 
 // Function to get the current configuration (from server or default)
 export const getCurrentConfig = async () => {
+  console.log("Getting current config...")
+
   const serverConfig = await loadConfigFromServer()
   if (serverConfig) {
+    console.log("Using server config")
     // Save to localStorage as a backup
     saveConfigToStorage(serverConfig)
     return serverConfig
   }
 
+  console.log("Server config failed, trying localStorage...")
   // If server fetch fails, try localStorage
   const localConfig = loadConfigFromStorage()
-  return localConfig || trackConfig
+  if (localConfig) {
+    console.log("Using local config")
+    return localConfig
+  }
+
+  console.log("Using default config")
+  return trackConfig
 }
 
 // Function to extract points from a modification string
@@ -126,6 +150,7 @@ export const formatBaseClass = (baseClass: string, hasAsterisk: boolean, hasDoll
 
 // Function to broadcast configuration changes
 export const broadcastConfigChange = (config: any) => {
+  console.log("Broadcasting config change:", config)
   // Create a custom event to notify other components about the config change
   const event = new CustomEvent("configUpdated", { detail: config })
   window.dispatchEvent(event)
