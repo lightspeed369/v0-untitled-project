@@ -105,14 +105,17 @@ export default function TrackClassCalculator() {
           console.log("Calculator: Polling for config updates...")
           const updatedConfig = await getCurrentConfig()
           // Only update if the config has actually changed
-          if (JSON.stringify(updatedConfig) !== JSON.stringify(config)) {
-            console.log("Calculator: Config changed, updating...")
-            setConfig(updatedConfig)
-            toast({
-              title: "Configuration Updated",
-              description: "The configuration has been updated.",
-            })
-          }
+          setConfig((prevConfig) => {
+            if (JSON.stringify(updatedConfig) !== JSON.stringify(prevConfig)) {
+              console.log("Calculator: Config changed, updating...")
+              toast({
+                title: "Configuration Updated",
+                description: "The configuration has been updated.",
+              })
+              return updatedConfig
+            }
+            return prevConfig
+          })
         } catch (error) {
           console.error("Calculator: Error checking for config updates:", error)
         }
@@ -124,7 +127,7 @@ export default function TrackClassCalculator() {
       window.removeEventListener("configUpdated", handleConfigUpdate as EventListener)
       clearInterval(intervalId)
     }
-  }, [config])
+  }, [])
 
   // Get all available makes
   const makes = Object.keys(config.models)
@@ -530,7 +533,6 @@ export default function TrackClassCalculator() {
 
   return (
     <div className="space-y-6">
-      {/* Add this button in the main header area, after the title: */}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-4xl font-bold text-center mb-2">
@@ -542,13 +544,15 @@ export default function TrackClassCalculator() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={refreshConfiguration} disabled={isLoading}>
-            {isLoading ? "Refreshing..." : "Refresh Config"}
-          </Button>
           <Link href="/admin" className="text-[#fec802] hover:text-[#fec802]/80 text-sm">
             Admin
           </Link>
         </div>
+      </div>
+      <div className="flex justify-end mb-4">
+        <Button variant="outline" onClick={refreshConfiguration} disabled={isLoading}>
+          {isLoading ? "Refreshing..." : "Refresh Config"}
+        </Button>
       </div>
       <Tabs value={activeTabSection} onValueChange={handleTabSectionChange} className="w-full">
         <TabsList className="grid w-full grid-cols-3 bg-black border border-[#fec802]/30">
