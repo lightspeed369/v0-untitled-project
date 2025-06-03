@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { AlertCircle, Car, Info, Save, Send } from "lucide-react"
+import { AlertCircle, Car, Info, Save, Send, Trash2 } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { trackConfig } from "@/lib/track-config"
 import { toast } from "@/components/ui/use-toast"
@@ -348,6 +348,32 @@ export default function TrackClassCalculator() {
 
     // Switch to calculator tab
     setActiveTabSection("calculator")
+  }
+
+  // Delete a saved configuration
+  const deleteConfiguration = (indexToDelete: number) => {
+    const configToDelete = savedConfigs[indexToDelete]
+
+    // Remove from state
+    const updatedConfigs = savedConfigs.filter((_, index) => index !== indexToDelete)
+    setSavedConfigs(updatedConfigs)
+
+    // Update localStorage
+    try {
+      localStorage.setItem("savedConfigs", JSON.stringify(updatedConfigs))
+
+      toast({
+        title: "Configuration Deleted",
+        description: `${configToDelete.make} ${configToDelete.model} configuration has been deleted.`,
+      })
+    } catch (error) {
+      console.error("Error updating localStorage:", error)
+      toast({
+        variant: "destructive",
+        title: "Delete Failed",
+        description: "There was an error deleting the configuration. Please try again.",
+      })
+    }
   }
 
   // Get class color based on class name
@@ -843,15 +869,27 @@ export default function TrackClassCalculator() {
                           </div>
                         </div>
                         <Separator className="my-2" />
-                        <div className="text-sm">
-                          <p>Total Points: {config.totalPoints}</p>
-                          <Button
-                            variant="link"
-                            className="p-0 h-auto text-[#fec802] text-sm"
-                            onClick={() => loadConfiguration(config)}
-                          >
-                            Load Configuration
-                          </Button>
+                        <div className="flex justify-between items-center">
+                          <div className="text-sm">
+                            <p>Total Points: {config.totalPoints}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="link"
+                              className="p-0 h-auto text-[#fec802] text-sm"
+                              onClick={() => loadConfiguration(config)}
+                            >
+                              Load Configuration
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                              onClick={() => deleteConfiguration(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
