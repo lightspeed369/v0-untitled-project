@@ -28,6 +28,7 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
   const [config, setConfig] = useState<any>(null)
+  const [originalConfig, setOriginalConfig] = useState<any>(null)
   const [changeLog, setChangeLog] = useState<any[]>([])
   const [lastModified, setLastModified] = useState<string>("")
   const [activeTab, setActiveTab] = useState("cars")
@@ -56,6 +57,7 @@ export default function AdminPage() {
       try {
         const currentData = await getCurrentConfig()
         setConfig(currentData.config)
+        setOriginalConfig(currentData.config) // Store original for comparison
         setChangeLog(currentData.changeLog || [])
         setLastModified(currentData.lastModified || "")
       } catch (error) {
@@ -423,8 +425,13 @@ export default function AdminPage() {
   const handleSaveConfig = async () => {
     setSaveSuccess(false)
 
-    // First, save to the server with admin info
-    const serverResult = await saveConfigToServer(config, adminId, "Configuration updated via admin panel")
+    // First, save to the server with admin info and original config for comparison
+    const serverResult = await saveConfigToServer(
+      config,
+      adminId,
+      "Configuration updated via admin panel",
+      originalConfig,
+    )
 
     // Also save to localStorage as a backup
     const localSuccess = saveConfigToStorage(config, serverResult.data?.timestamp)
@@ -437,6 +444,9 @@ export default function AdminPage() {
       if (serverResult.data?.timestamp) {
         setLastModified(serverResult.data.timestamp)
       }
+
+      // Update original config to current config for next comparison
+      setOriginalConfig({ ...config })
 
       // Broadcast the configuration change
       broadcastConfigChange(config, serverResult.data?.timestamp)
@@ -909,7 +919,9 @@ export default function AdminPage() {
                       <History className="h-5 w-5 text-[#fec802]" />
                       Admin Change Log
                     </CardTitle>
-                    <CardDescription>Track of all administrative changes made to the configuration</CardDescription>
+                    <CardDescription>
+                      Detailed track of all administrative changes made to the configuration
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-6">
                     {changeLog.length === 0 ? (
@@ -918,21 +930,40 @@ export default function AdminPage() {
                         <p className="text-sm mt-2">Changes will appear here after admin modifications are saved.</p>
                       </div>
                     ) : (
-                      <ScrollArea className="h-[400px] pr-4">
+                      <ScrollArea className="h-[500px] pr-4">
                         <div className="space-y-4">
                           {changeLog.map((entry, index) => (
                             <div key={index} className="p-4 bg-black border border-[#fec802]/30 rounded-lg">
-                              <div className="flex justify-between items-start mb-2">
+                              <div className="flex justify-between items-start mb-3">
                                 <div className="flex items-center gap-2">
                                   <Clock className="h-4 w-4 text-[#fec802]" />
-                                  <span className="font-medium">{entry.action}</span>
+                                  <span className="font-medium text-[#fec802]">{entry.action}</span>
                                 </div>
                                 <span className="text-sm text-gray-400">
                                   {new Date(entry.timestamp).toLocaleString()}
                                 </span>
                               </div>
-                              <p className="text-sm text-gray-300">{entry.details}</p>
-                              {entry.adminId && <p className="text-xs text-gray-500 mt-1">Admin: {entry.adminId}</p>}
+
+                              {entry.adminId && (
+                                <p className="text-sm text-gray-400 mb-2">
+                                  <strong>Admin:</strong> {entry.adminId}
+                                </p>
+                              )}
+
+                              <div className="text-sm text-gray-300">
+                                <strong>Changes Made:</strong>
+                                <div className="mt-2 pl-4 border-l-2 border-[#fec802]/30">
+                                  {entry.changeDetails ? (
+                                    entry.changeDetails.split("; ").map((change, changeIndex) => (
+                                      <div key={changeIndex} className="py-1">
+                                        • {change}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="py-1">• {entry.details}</div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>

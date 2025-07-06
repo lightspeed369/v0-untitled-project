@@ -32,19 +32,25 @@ export async function GET() {
 // Update the configuration
 export async function POST(request: Request) {
   try {
-    const { config: newConfig, adminId = "admin", action = "Configuration updated" } = await request.json()
+    const {
+      config: newConfig,
+      adminId = "admin",
+      action = "Configuration updated",
+      changeDetails,
+    } = await request.json()
 
     // Update the global configuration
     const previousConfig = JSON.stringify(globalConfig)
     globalConfig = { ...newConfig }
     lastModified = new Date().toISOString()
 
-    // Add to change log
+    // Add to change log with detailed information
     const logEntry = {
       timestamp: lastModified,
       action,
-      details: `Configuration updated by ${adminId}`,
+      details: changeDetails || `Configuration updated by ${adminId}`,
       adminId,
+      changeDetails: changeDetails || "No specific changes recorded",
     }
 
     changeLog.unshift(logEntry) // Add to beginning of array
