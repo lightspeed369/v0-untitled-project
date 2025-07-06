@@ -3,7 +3,7 @@
 import { trackConfig } from "./track-config"
 
 // Function to save configuration to the server
-export const saveConfigToServer = async (config: any) => {
+export const saveConfigToServer = async (config: any, adminId = "admin", action = "Configuration updated") => {
   try {
     console.log("Saving config to server:", config)
 
@@ -12,7 +12,12 @@ export const saveConfigToServer = async (config: any) => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(config),
+      body: JSON.stringify({
+        config,
+        adminId,
+        action,
+        timestamp: new Date().toISOString(),
+      }),
     })
 
     const data = await response.json()
@@ -46,9 +51,9 @@ export const loadConfigFromServer = async () => {
       throw new Error(`Failed to fetch configuration: ${response.status} ${response.statusText}`)
     }
 
-    const config = await response.json()
-    console.log("Loaded config from server:", config)
-    return config
+    const data = await response.json()
+    console.log("Loaded data from server:", data)
+    return data
   } catch (error) {
     console.error("Error loading config from server:", error)
     return null
@@ -56,9 +61,14 @@ export const loadConfigFromServer = async () => {
 }
 
 // Function to save configuration to localStorage (as backup)
-export const saveConfigToStorage = (config: any) => {
+export const saveConfigToStorage = (config: any, lastModified?: string) => {
   try {
-    localStorage.setItem("trackConfig", JSON.stringify(config))
+    const dataToSave = {
+      config,
+      lastModified: lastModified || new Date().toISOString(),
+      savedAt: new Date().toISOString(),
+    }
+    localStorage.setItem("trackConfig", JSON.stringify(dataToSave))
     return true
   } catch (error) {
     console.error("Error saving config to localStorage:", error)
@@ -69,9 +79,10 @@ export const saveConfigToStorage = (config: any) => {
 // Function to load configuration from localStorage
 export const loadConfigFromStorage = () => {
   try {
-    const savedConfig = localStorage.getItem("trackConfig")
-    if (savedConfig) {
-      return JSON.parse(savedConfig)
+    const savedData = localStorage.getItem("trackConfig")
+    if (savedData) {
+      const parsed = JSON.parse(savedData)
+      return parsed.config ? parsed : { config: parsed, lastModified: new Date().toISOString() }
     }
     return null
   } catch (error) {
@@ -84,24 +95,32 @@ export const loadConfigFromStorage = () => {
 export const getCurrentConfig = async () => {
   console.log("Getting current config...")
 
-  const serverConfig = await loadConfigFromServer()
-  if (serverConfig) {
+  const serverData = await loadConfigFromServer()
+  if (serverData && serverData.config) {
     console.log("Using server config")
     // Save to localStorage as a backup
-    saveConfigToStorage(serverConfig)
-    return serverConfig
+    saveConfigToStorage(serverData.config, serverData.lastModified)
+    return serverData
   }
 
   console.log("Server config failed, trying localStorage...")
   // If server fetch fails, try localStorage
-  const localConfig = loadConfigFromStorage()
-  if (localConfig) {
+  const localData = loadConfigFromStorage()
+  if (localData && localData.config) {
     console.log("Using local config")
-    return localConfig
+    return {
+      config: localData.config,
+      lastModified: localData.lastModified || new Date().toISOString(),
+      changeLog: [],
+    }
   }
 
   console.log("Using default config")
-  return trackConfig
+  return {
+    config: trackConfig,
+    lastModified: new Date().toISOString(),
+    changeLog: [],
+  }
 }
 
 // Function to extract points from a modification string
@@ -149,9 +168,14 @@ export const formatBaseClass = (baseClass: string, hasAsterisk: boolean, hasDoll
 }
 
 // Function to broadcast configuration changes
-export const broadcastConfigChange = (config: any) => {
+export const broadcastConfigChange = (config: any, lastModified?: string) => {
   console.log("Broadcasting config change:", config)
   // Create a custom event to notify other components about the config change
-  const event = new CustomEvent("configUpdated", { detail: config })
+  const event = new CustomEvent("configUpdated", {
+    detail: {
+      config,
+      lastModified: lastModified || new Date().toISOString(),
+    },
+  })
   window.dispatchEvent(event)
 }

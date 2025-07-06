@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "@/components/ui/use-toast"
-import { Check, Edit, Lock, Save, X } from "lucide-react"
+import { Check, Edit, Lock, Save, X, History, Clock } from "lucide-react"
 import {
   getCurrentConfig,
   saveConfigToServer,
@@ -28,6 +28,8 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
   const [config, setConfig] = useState<any>(null)
+  const [changeLog, setChangeLog] = useState<any[]>([])
+  const [lastModified, setLastModified] = useState<string>("")
   const [activeTab, setActiveTab] = useState("cars")
   const [selectedMake, setSelectedMake] = useState("")
   const [selectedModel, setSelectedModel] = useState("")
@@ -45,14 +47,17 @@ export default function AdminPage() {
   const [editModName, setEditModName] = useState("")
   const [editModPoints, setEditModPoints] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [adminId, setAdminId] = useState("admin")
 
   // Load configuration on component mount
   useEffect(() => {
     const loadConfig = async () => {
       setIsLoading(true)
       try {
-        const currentConfig = await getCurrentConfig()
-        setConfig(currentConfig)
+        const currentData = await getCurrentConfig()
+        setConfig(currentData.config)
+        setChangeLog(currentData.changeLog || [])
+        setLastModified(currentData.lastModified || "")
       } catch (error) {
         console.error("Error loading configuration:", error)
         toast({
@@ -418,15 +423,23 @@ export default function AdminPage() {
   const handleSaveConfig = async () => {
     setSaveSuccess(false)
 
-    // First, save to the server
-    const serverResult = await saveConfigToServer(config)
+    // First, save to the server with admin info
+    const serverResult = await saveConfigToServer(config, adminId, "Configuration updated via admin panel")
 
     // Also save to localStorage as a backup
-    const localSuccess = saveConfigToStorage(config)
+    const localSuccess = saveConfigToStorage(config, serverResult.data?.timestamp)
 
     if (serverResult.success) {
+      // Update local state with new change log
+      if (serverResult.data?.changeLog) {
+        setChangeLog(serverResult.data.changeLog)
+      }
+      if (serverResult.data?.timestamp) {
+        setLastModified(serverResult.data.timestamp)
+      }
+
       // Broadcast the configuration change
-      broadcastConfigChange(config)
+      broadcastConfigChange(config, serverResult.data?.timestamp)
 
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
@@ -502,6 +515,9 @@ export default function AdminPage() {
             )}
           </div>
           <CardDescription>Manage car makes, models, and modification categories</CardDescription>
+          {lastModified && (
+            <div className="text-sm text-gray-400 mt-2">Last modified: {new Date(lastModified).toLocaleString()}</div>
+          )}
         </CardHeader>
         <CardContent className="pt-6">
           {!isAuthenticated ? (
@@ -511,27 +527,45 @@ export default function AdminPage() {
                 <AlertTitle>Authentication Required</AlertTitle>
                 <AlertDescription>Please enter the administrator password to access the admin panel.</AlertDescription>
               </Alert>
-              <div className="flex gap-4">
-                <Input
-                  type="password"
-                  placeholder="Enter admin password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <Button onClick={handleAuthenticate}>Login</Button>
-                <Button variant="outline" onClick={() => (window.location.href = "/")}>
-                  Back to Home
-                </Button>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="admin-id">Admin ID</Label>
+                  <Input
+                    id="admin-id"
+                    placeholder="Enter your admin ID"
+                    value={adminId}
+                    onChange={(e) => setAdminId(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-4">
+                  <Input
+                    type="password"
+                    placeholder="Enter admin password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <Button onClick={handleAuthenticate}>Login</Button>
+                  <Button variant="outline" onClick={() => (window.location.href = "/")}>
+                    Back to Home
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-black border border-[#fec802]/30">
+              <TabsList className="grid w-full grid-cols-3 bg-black border border-[#fec802]/30">
                 <TabsTrigger value="cars" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
                   Car Makes & Models
                 </TabsTrigger>
                 <TabsTrigger value="mods" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
                   Modification Categories
+                </TabsTrigger>
+                <TabsTrigger
+                  value="changelog"
+                  className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                >
+                  <History className="h-4 w-4 mr-2" />
+                  Change Log
                 </TabsTrigger>
               </TabsList>
 
@@ -866,6 +900,46 @@ export default function AdminPage() {
                     </Card>
                   )}
                 </div>
+              </TabsContent>
+
+              <TabsContent value="changelog" className="space-y-6 mt-4">
+                <Card className="border-[#fec802]/30 bg-black">
+                  <CardHeader className="border-b border-[#fec802]/30">
+                    <CardTitle className="flex items-center gap-2">
+                      <History className="h-5 w-5 text-[#fec802]" />
+                      Admin Change Log
+                    </CardTitle>
+                    <CardDescription>Track of all administrative changes made to the configuration</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    {changeLog.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400">
+                        <p>No changes recorded yet.</p>
+                        <p className="text-sm mt-2">Changes will appear here after admin modifications are saved.</p>
+                      </div>
+                    ) : (
+                      <ScrollArea className="h-[400px] pr-4">
+                        <div className="space-y-4">
+                          {changeLog.map((entry, index) => (
+                            <div key={index} className="p-4 bg-black border border-[#fec802]/30 rounded-lg">
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-4 w-4 text-[#fec802]" />
+                                  <span className="font-medium">{entry.action}</span>
+                                </div>
+                                <span className="text-sm text-gray-400">
+                                  {new Date(entry.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-300">{entry.details}</p>
+                              {entry.adminId && <p className="text-xs text-gray-500 mt-1">Admin: {entry.adminId}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           )}

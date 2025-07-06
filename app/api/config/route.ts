@@ -1,32 +1,67 @@
 import { NextResponse } from "next/server"
 import { trackConfig } from "@/lib/track-config"
 
-// Simple in-memory store for configuration
+// Simple in-memory store for configuration with timestamp
 let globalConfig = { ...trackConfig }
+let lastModified = new Date().toISOString()
+let changeLog: Array<{
+  timestamp: string
+  action: string
+  details: string
+  adminId?: string
+}> = []
 
 // Get the current configuration
 export async function GET() {
   try {
-    return NextResponse.json(globalConfig)
+    return NextResponse.json({
+      config: globalConfig,
+      lastModified,
+      changeLog,
+    })
   } catch (error) {
     console.error("Error reading config:", error)
-    return NextResponse.json(trackConfig)
+    return NextResponse.json({
+      config: trackConfig,
+      lastModified: new Date().toISOString(),
+      changeLog: [],
+    })
   }
 }
 
 // Update the configuration
 export async function POST(request: Request) {
   try {
-    const newConfig = await request.json()
+    const { config: newConfig, adminId = "admin", action = "Configuration updated" } = await request.json()
 
     // Update the global configuration
+    const previousConfig = JSON.stringify(globalConfig)
     globalConfig = { ...newConfig }
+    lastModified = new Date().toISOString()
 
-    console.log("Configuration updated successfully")
+    // Add to change log
+    const logEntry = {
+      timestamp: lastModified,
+      action,
+      details: `Configuration updated by ${adminId}`,
+      adminId,
+    }
+
+    changeLog.unshift(logEntry) // Add to beginning of array
+
+    // Keep only last 50 entries
+    if (changeLog.length > 50) {
+      changeLog = changeLog.slice(0, 50)
+    }
+
+    console.log("Configuration updated successfully by:", adminId)
+    console.log("Change log entry added:", logEntry)
+
     return NextResponse.json({
       success: true,
       message: "Configuration updated successfully",
-      timestamp: new Date().toISOString(),
+      timestamp: lastModified,
+      changeLog,
     })
   } catch (error) {
     console.error("Error updating config:", error)
