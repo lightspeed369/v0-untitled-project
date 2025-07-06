@@ -3,9 +3,22 @@
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import { AlertCircle, Car, Info, Save, Send, Trash2 } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { trackConfig } from "@/lib/track-config"
 import { toast } from "@/components/ui/use-toast"
 import { ToastAction } from "@/components/ui/toast"
+import { Input } from "@/components/ui/input"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useMobile } from "@/hooks/use-mobile"
 import { getCurrentConfig } from "@/lib/admin-utils"
 
@@ -93,7 +106,7 @@ export default function TrackClassCalculator() {
         try {
           console.log("Calculator: Polling for config updates...")
           const updatedData = await getCurrentConfig()
-          
+
           // Only update if the lastModified timestamp is different
           if (updatedData.lastModified && updatedData.lastModified !== lastModified) {
             console.log("Calculator: Config timestamp changed, updating...")
@@ -446,4 +459,636 @@ export default function TrackClassCalculator() {
       const config = savedConfigs[selectedConfigIndex]
       const timestamp = new Date().toISOString()
 
-// Combine first
+      // Combine first and last name for submission
+      const fullName = `${firstName} ${lastName}`
+
+      // Format the data for Google Form submission using the exact field IDs from your Google Form
+      const formData = new FormData()
+
+      // Map form fields to the correct entry IDs from your Google Form
+      formData.append("entry.258378709", new Date().toISOString().split("T")[0]) // Current date for Effective Date
+      formData.append("entry.163721629", fullName) // Driver Name (combined)
+      formData.append("entry.292301949", `${config.make} ${config.model}`) // Vehicle Make/Model
+      formData.append("entry.1339041663", carNumber) // Car Number
+      formData.append("entry.422981728", driverEmail) // Email Address
+      formData.append("entry.1491829505", team || "N/A") // Team
+      formData.append("entry.2081807962", cleanBaseClass(config.baseClass)) // Base Class (without special indicators)
+      formData.append("entry.1533485464", config.finalClass) // Final Class
+      formData.append("entry.245375180", config.totalPoints.toString()) // Total Points
+      formData.append("entry.555215744", formatModificationsForSubmission(config.mods)) // Modifications only
+
+      // Submit to the Google Form
+      const formId = "1FAIpQLSfOULSPEv-xkaSdyK_sMcBfM1O3kqFah8BgpfJQbatlPffKFA"
+      const response = await fetch(`https://docs.google.com/forms/d/e/${formId}/formResponse`, {
+        method: "POST",
+        body: formData,
+        mode: "no-cors", // Required for Google Forms
+      })
+
+      setSubmissionSuccess(true)
+      toast({
+        title: "Submission successful",
+        description: "Your configuration has been submitted successfully to LightSpeed TimeTrial Database.",
+      })
+
+      // Reset form fields
+      setFirstName("")
+      setLastName("")
+      setDriverEmail("")
+      setCarNumber("")
+      setTeam("")
+      setSelectedConfigIndex(null)
+    } catch (error) {
+      console.error("Error submitting form:", error)
+      toast({
+        variant: "destructive",
+        title: "Submission failed",
+        description: "There was an error submitting your configuration. Please try again.",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Get modification categories for tabs
+  const getModificationCategories = () => {
+    return Object.keys(config.scoreLookupTable).filter(
+      (category) => category !== "classesScore" && Array.isArray(config[category]),
+    )
+  }
+
+  // Format category name for display
+  const formatCategoryName = (category: string) => {
+    if (category === "weight-reduction") return "Weight Reduction"
+    return category.charAt(0).toUpperCase() + category.slice(1)
+  }
+
+  // Add this function after the other handler functions:
+  const refreshConfiguration = async () => {
+    setIsLoading(true)
+    try {
+      console.log("Manual refresh: Loading configuration...")
+      const currentData = await getCurrentConfig()
+      console.log("Manual refresh: Loaded data:", currentData)
+      setConfig(currentData.config)
+      setLastModified(currentData.lastModified || "")
+      toast({
+        title: "Configuration Refreshed",
+        description: "Configuration has been refreshed from the server.",
+      })
+    } catch (error) {
+      console.error("Manual refresh: Error loading configuration:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to refresh configuration.",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#fec802] mx-auto"></div>
+          <p className="mt-4">Loading calculator...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center mb-4">
+        <div className="text-sm text-gray-400">
+          {lastModified && `Last updated: ${new Date(lastModified).toLocaleString()}`}
+        </div>
+        <Button variant="outline" onClick={refreshConfiguration} disabled={isLoading}>
+          {isLoading ? "Refreshing..." : "Refresh Config"}
+        </Button>
+      </div>
+      <Tabs value={activeTabSection} onValueChange={handleTabSectionChange} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 bg-black border border-[#fec802]/30">
+          <TabsTrigger value="calculator" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
+            Calculator
+          </TabsTrigger>
+          <TabsTrigger value="saved" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
+            Saved
+          </TabsTrigger>
+          <TabsTrigger value="submit" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
+            Submit
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="calculator" className="space-y-6 mt-4">
+          <Card className="border-[#fec802]/30 bg-black">
+            <CardHeader className="border-b border-[#fec802]/30">
+              <CardTitle className="flex items-center gap-2">
+                <Car className="h-5 w-5 text-[#fec802]" />
+                Vehicle Selection
+              </CardTitle>
+              <CardDescription>Select your vehicle make and model to determine the base class</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="make">Make</Label>
+                  <Select value={make} onValueChange={handleMakeChange}>
+                    <SelectTrigger id="make">
+                      <SelectValue placeholder="Select make" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {makes.map((makeName) => (
+                        <SelectItem key={makeName} value={makeName}>
+                          {makeName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="model">Model</Label>
+                  <Select value={model} onValueChange={handleModelChange} disabled={!make}>
+                    <SelectTrigger id="model">
+                      <SelectValue placeholder={make ? "Select model" : "Select make first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getModels(make).map((modelName) => (
+                        <SelectItem key={modelName} value={modelName}>
+                          {modelName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {baseClass && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Base Class</AlertTitle>
+                  <AlertDescription>
+                    <div className="flex items-center gap-2">
+                      Your vehicle's base class is:
+                      <Badge className={`${getClassColor(cleanBaseClass(baseClass))} text-white`}>
+                        {cleanBaseClass(baseClass)}
+                      </Badge>
+                    </div>
+
+                    {getSpecialIndicatorsExplanation() && (
+                      <div className="mt-2 text-sm">
+                        <strong>Special Indicators:</strong> {getSpecialIndicatorsExplanation()}
+                      </div>
+                    )}
+
+                    {baseClassPoints > 0 && (
+                      <div className="mt-1 text-sm">
+                        Base class special indicators add <strong>+{baseClassPoints} points</strong> to your total.
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          {baseClass && (
+            <Card className="border-[#fec802]/30 bg-black">
+              <CardHeader className="border-b border-[#fec802]/30">
+                <CardTitle>Modifications</CardTitle>
+                <CardDescription>
+                  Select all modifications that apply to your vehicle
+                  <span className="text-red-400 ml-1">(tire selection is required)</span>
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+                  {/* Mobile-optimized tab list */}
+                  {isMobile ? (
+                    <div className="mb-4">
+                      <Select value={activeTab} onValueChange={handleTabChange}>
+                        <SelectTrigger className="bg-black border-[#fec802]/30">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getModificationCategories().map((category) => (
+                            <SelectItem
+                              key={category}
+                              value={category}
+                              className={category === "tires" && tiresError ? "text-red-400" : ""}
+                            >
+                              {formatCategoryName(category)}
+                              {category === "tires" ? "*" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <ScrollArea className="w-full">
+                      <TabsList className="inline-flex w-auto bg-black border border-[#fec802]/30">
+                        {getModificationCategories().map((category) => (
+                          <TabsTrigger
+                            key={category}
+                            value={category}
+                            className={`data-[state=active]:bg-[#fec802] data-[state=active]:text-black ${
+                              category === "tires" && tiresError ? "text-red-400 border-red-400" : ""
+                            }`}
+                          >
+                            {formatCategoryName(category)}
+                            {category === "tires" ? "*" : ""}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                    </ScrollArea>
+                  )}
+
+                  {getModificationCategories().map((category) => (
+                    <TabsContent key={category} value={category} className="space-y-4 mt-4">
+                      {category === "tires" && (
+                        <Alert variant={tiresError ? "destructive" : "default"} className="mb-4">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertTitle>Required Selection</AlertTitle>
+                          <AlertDescription>
+                            You must select at least one tire type. If you're using the original OEM tires, select that
+                            option.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      <ScrollArea className={`${isMobile ? "h-[250px]" : "h-[300px]"} pr-4`}>
+                        {config[category]?.map((item: string, index: number) => (
+                          <div key={item} className="flex items-start space-x-2 py-2">
+                            <Checkbox
+                              id={`${category}-${index}`}
+                              checked={selectedMods[category]?.includes(item)}
+                              onCheckedChange={(checked) => handleModChange(category, item, checked === true)}
+                              // For tires, make it radio-like behavior by unchecking others when one is selected
+                              onClick={() => {
+                                if (category === "tires" && !selectedMods[category]?.includes(item)) {
+                                  setSelectedMods((prev) => ({
+                                    ...prev,
+                                    tires: [],
+                                  }))
+                                }
+                              }}
+                            />
+                            <div className="grid gap-1.5 leading-none">
+                              <Label
+                                htmlFor={`${category}-${index}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                {/* Extract the full description without the last points part */}
+                                {item.substring(0, item.lastIndexOf("(")).trim()}
+                                <Badge className="ml-2 bg-gray-700">
+                                  {config.scoreLookupTable[category][item] > 0
+                                    ? `+${config.scoreLookupTable[category][item]}`
+                                    : config.scoreLookupTable[category][item]}{" "}
+                                  points
+                                </Badge>
+                              </Label>
+                            </div>
+                          </div>
+                        ))}
+                      </ScrollArea>
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </CardContent>
+              <CardFooter className="flex flex-col sm:flex-row gap-4 justify-between border-t border-[#fec802]/20 pt-6">
+                <Button
+                  onClick={calculateResults}
+                  className="w-full sm:w-auto bg-[#fec802] hover:bg-[#fec802]/80 text-black"
+                >
+                  Calculate Class
+                </Button>
+                <Button variant="outline" onClick={resetForm} className="w-full sm:w-auto bg-transparent">
+                  Reset
+                </Button>
+              </CardFooter>
+            </Card>
+          )}
+
+          {showResults && (
+            <Card className="border-[#fec802]/30 bg-black" ref={resultsRef}>
+              <CardHeader className="border-b border-[#fec802]/30">
+                <CardTitle>Results</CardTitle>
+                <CardDescription>Your vehicle's classification based on modifications</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-black border border-[#fec802]/30 rounded-lg text-center">
+                    <p className="text-sm text-gray-400">Base Class</p>
+                    <Badge className={`${getClassColor(cleanBaseClass(baseClass))} text-white text-lg py-1 px-3 mt-1`}>
+                      {cleanBaseClass(baseClass)}
+                    </Badge>
+                    {baseClassPoints > 0 && (
+                      <p className="text-xs text-gray-400 mt-1">+{baseClassPoints} points from indicators</p>
+                    )}
+                  </div>
+
+                  <div className="p-4 bg-black border border-[#fec802]/30 rounded-lg text-center">
+                    <p className="text-sm text-gray-400">Modification Points</p>
+                    <div className="flex flex-col items-center justify-center mt-1">
+                      <p className="text-2xl font-bold">{totalPoints}</p>
+                      {baseClassPoints > 0 && (
+                        <div className="text-xs text-gray-400 mt-1">
+                          ({baseClassPoints} from base class + {modificationPoints} from mods)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-black border border-[#fec802]/30 rounded-lg text-center">
+                    <p className="text-sm text-gray-400">Final Class</p>
+                    <Badge className={`${getClassColor(finalClass)} text-white text-lg py-1 px-3 mt-1`}>
+                      {finalClass}
+                    </Badge>
+                  </div>
+                </div>
+
+                <Alert className="bg-black border-[#fec802]/30">
+                  <Info className="h-4 w-4 text-[#fec802]" />
+                  <AlertTitle>Classification Summary</AlertTitle>
+                  <AlertDescription>
+                    <p>
+                      Your {make} {model} has been classified as <strong>{finalClass}</strong> based on your
+                      modifications.
+                    </p>
+                    {cleanBaseClass(baseClass) !== finalClass && (
+                      <p className="mt-1">
+                        Your vehicle moved up from {cleanBaseClass(baseClass)} to {finalClass} due to {totalPoints}{" "}
+                        total points
+                        {baseClassPoints > 0 ? ` (including ${baseClassPoints} points from base class indicators)` : ""}
+                        .
+                      </p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+
+                <Button onClick={saveConfiguration} className="w-full mt-4" variant="secondary">
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Configuration
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="saved" className="mt-4">
+          <Card className="border-[#fec802]/30 bg-black">
+            <CardHeader className="border-b border-[#fec802]/30">
+              <CardTitle>Saved Configurations</CardTitle>
+              <CardDescription>Your previously saved vehicle configurations</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {savedConfigs.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p>No saved configurations yet.</p>
+                  <p className="text-sm mt-2">Calculate and save a configuration to see it here.</p>
+                </div>
+              ) : (
+                <ScrollArea className={`${isMobile ? "h-[350px]" : "h-[400px]"}`}>
+                  <div className="space-y-4">
+                    {savedConfigs.map((config, index) => (
+                      <div key={index} className="p-4 bg-black border border-[#fec802]/30 rounded-lg">
+                        <div className={`flex ${isMobile ? "flex-col" : "justify-between"} items-start`}>
+                          <div>
+                            <h3 className="font-medium">
+                              {config.make} {config.model}
+                            </h3>
+                            <p className="text-sm text-gray-400">
+                              {new Date(config.timestamp).toLocaleDateString()} at{" "}
+                              {new Date(config.timestamp).toLocaleTimeString()}
+                            </p>
+                          </div>
+                          <div className={`flex gap-2 ${isMobile ? "mt-2" : ""}`}>
+                            <Badge className={`${getClassColor(cleanBaseClass(config.baseClass))} text-white`}>
+                              Base: {cleanBaseClass(config.baseClass)}
+                            </Badge>
+                            <Badge className={`${getClassColor(config.finalClass)} text-white`}>
+                              Final: {config.finalClass}
+                            </Badge>
+                          </div>
+                        </div>
+                        <Separator className="my-2" />
+                        <div className="flex justify-between items-center">
+                          <div className="text-sm">
+                            <p>Total Points: {config.totalPoints}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="link"
+                              className="p-0 h-auto text-[#fec802] text-sm"
+                              onClick={() => loadConfiguration(config)}
+                            >
+                              Load Configuration
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                              onClick={() => deleteConfiguration(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="submit" className="mt-4">
+          <Card className="border-[#fec802]/30 bg-black">
+            <CardHeader className="border-b border-[#fec802]/30">
+              <CardTitle>Submit Configuration</CardTitle>
+              <CardDescription>
+                Submit your vehicle configuration for event registration or technical inspection
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {submissionSuccess ? (
+                <div className="text-center py-8">
+                  <div className="bg-green-900/20 text-green-400 p-4 rounded-lg mb-4">
+                    <h3 className="text-lg font-medium">Submission Successful!</h3>
+                    <p>Your configuration has been submitted successfully to LightSpeed TimeTrial Database.</p>
+                    <p className="text-sm mt-2">Submission time: {new Date().toLocaleString()}</p>
+                  </div>
+                  <Button
+                    onClick={() => setSubmissionSuccess(false)}
+                    className="bg-[#fec802] hover:bg-[#fec802]/80 text-black"
+                  >
+                    Submit Another Configuration
+                  </Button>
+                </div>
+              ) : savedConfigs.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p>No saved configurations available to submit.</p>
+                  <p className="text-sm mt-2">Please calculate and save a configuration before submitting.</p>
+                </div>
+              ) : (
+                <form onSubmit={submitConfiguration} className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">1. Select Configuration</h3>
+                    <div className="space-y-4">
+                      <RadioGroup
+                        value={selectedConfigIndex !== null ? selectedConfigIndex.toString() : undefined}
+                        onValueChange={(value) => setSelectedConfigIndex(Number.parseInt(value))}
+                      >
+                        {savedConfigs.map((config, index) => (
+                          <div
+                            key={index}
+                            className="flex items-start space-x-2 p-4 border rounded-lg border-[#fec802]/30 bg-black"
+                          >
+                            <RadioGroupItem value={index.toString()} id={`config-${index}`} />
+                            <div className="grid gap-1.5 leading-none w-full">
+                              <Label htmlFor={`config-${index}`} className="text-base font-medium">
+                                {config.make} {config.model}
+                              </Label>
+                              <div className={`flex ${isMobile ? "flex-col" : "justify-between"} items-start mt-2`}>
+                                <div className="text-sm text-gray-400">
+                                  {new Date(config.timestamp).toLocaleDateString()} at{" "}
+                                  {new Date(config.timestamp).toLocaleTimeString()}
+                                </div>
+                                <div className={`flex gap-2 ${isMobile ? "mt-1" : ""}`}>
+                                  <Badge className={`${getClassColor(cleanBaseClass(config.baseClass))} text-white`}>
+                                    Base: {cleanBaseClass(config.baseClass)}
+                                  </Badge>
+                                  <Badge className={`${getClassColor(config.finalClass)} text-white`}>
+                                    Final: {config.finalClass}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">2. Driver Information</h3>
+                    <Alert className="mb-4 bg-[#fec802]/10 border-[#fec802]/20">
+                      <Info className="h-4 w-4 text-[#fec802]" />
+                      <AlertTitle>Important Note</AlertTitle>
+                      <AlertDescription>
+                        The latest submission will be used to determine your vehicle's classification.
+                      </AlertDescription>
+                    </Alert>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="first-name">First Name*</Label>
+                        <Input
+                          id="first-name"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          placeholder="Enter your first name"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="last-name">Last Name*</Label>
+                        <Input
+                          id="last-name"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          placeholder="Enter your last name"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="driver-email">Email Address*</Label>
+                        <Input
+                          id="driver-email"
+                          type="email"
+                          value={driverEmail}
+                          onChange={(e) => setDriverEmail(e.target.value)}
+                          placeholder="Enter your email address"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="team">Team</Label>
+                        <Input
+                          id="team"
+                          value={team}
+                          onChange={(e) => setTeam(e.target.value)}
+                          placeholder="Enter your team name (optional)"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="car-number">Car Number*</Label>
+                        <Input
+                          id="car-number"
+                          value={carNumber}
+                          onChange={(e) => setCarNumber(e.target.value)}
+                          placeholder="Enter your car number"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2 flex items-end">
+                        <a
+                          href="mailto:oguo@lightspeedclub.com"
+                          className="inline-flex items-center justify-content-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-[#fec802] text-black hover:bg-[#fec802]/80 h-10 px-4 py-2 w-full"
+                        >
+                          Email TimeTrial Director
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-[#fec802] hover:bg-[#fec802]/80 text-black"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <svg
+                          className="animate-spin -ml-1 mr-3 h-4 w-4 text-black"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        Submit Configuration
+                      </>
+                    )}
+                  </Button>
+                </form>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
