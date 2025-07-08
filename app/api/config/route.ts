@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server"
-import { readConfigFromKV, writeConfigToKV } from "./kv-store"
+import { readConfig, writeConfig } from "./store"
 
 // Get the current configuration from Vercel KV
 export async function GET() {
   try {
-    const { config, lastModified, changeLog } = await readConfigFromKV()
-    return NextResponse.json({ config, lastModified, changeLog })
+    const { config, lastModified, changeLog, isPersistenceEnabled } = await readConfig()
+    return NextResponse.json({ config, lastModified, changeLog, isPersistenceEnabled })
   } catch (error: any) {
     console.error("Error in GET /api/config:", error)
     return NextResponse.json(
-      { success: false, message: "Failed to read configuration from KV store.", error: error.message },
+      { success: false, message: "Failed to read configuration.", error: error.message },
       { status: 500 },
     )
   }
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "No configuration data provided." }, { status: 400 })
     }
 
-    const updatedData = await writeConfigToKV({
+    const updatedData = await writeConfig({
       config: newConfig,
       adminId,
       action,

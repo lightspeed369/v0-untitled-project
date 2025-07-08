@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "@/components/ui/use-toast"
-import { Check, Edit, Lock, Save, X, History, Clock } from "lucide-react"
+import { Check, Edit, Lock, Save, X, History, Clock, AlertTriangle } from "lucide-react"
 import {
   getCurrentConfig,
   saveConfigToServer,
@@ -49,6 +49,7 @@ export default function AdminPage() {
   const [editModPoints, setEditModPoints] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [adminId, setAdminId] = useState("admin")
+  const [isPersistenceEnabled, setIsPersistenceEnabled] = useState(true)
 
   // Load configuration on component mount
   useEffect(() => {
@@ -60,6 +61,7 @@ export default function AdminPage() {
         setOriginalConfig(JSON.parse(JSON.stringify(currentData.config))) // Deep copy for comparison
         setChangeLog(currentData.changeLog || [])
         setLastModified(currentData.lastModified || "")
+        setIsPersistenceEnabled(currentData.isPersistenceEnabled) // Set the new state
       } catch (error) {
         console.error("Error loading configuration:", error)
         toast({
@@ -461,7 +463,7 @@ export default function AdminPage() {
       toast({
         variant: "destructive",
         title: "Server save failed",
-        description: `Failed to save to server: ${serverResult.error || "Unknown error"}. Please check console for details.`,
+        description: `Failed to save to server: ${serverResult.error || "Unknown error"}. If persistence is disabled, please add the Vercel KV integration.`,
         duration: 9000,
       })
     }
@@ -529,6 +531,16 @@ export default function AdminPage() {
           )}
         </CardHeader>
         <CardContent className="pt-6">
+          {!isPersistenceEnabled && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Persistence is Disabled</AlertTitle>
+              <AlertDescription>
+                The server is not configured with a Vercel KV store. Any changes you make will be lost when the server
+                restarts. Please add the Vercel KV integration to enable persistent storage.
+              </AlertDescription>
+            </Alert>
+          )}
           {!isAuthenticated ? (
             <div className="space-y-4">
               <Alert className="bg-black border-[#fec802]/30">

@@ -67,7 +67,7 @@ export const loadConfigFromServer = async () => {
 
     const data = await response.json()
     console.log("Loaded data from server:", data)
-    return data
+    return data // This now returns { config, lastModified, changeLog, isPersistenceEnabled }
   } catch (error) {
     console.error("Error loading config from server:", error)
     return null
@@ -114,7 +114,7 @@ export const getCurrentConfig = async () => {
     console.log("Using server config")
     // Save to localStorage as a backup
     saveConfigToStorage(serverData.config, serverData.lastModified)
-    return serverData
+    return serverData // This will now include `isPersistenceEnabled`
   }
 
   console.log("Server config failed, trying localStorage...")
@@ -126,6 +126,7 @@ export const getCurrentConfig = async () => {
       config: localData.config,
       lastModified: localData.lastModified || new Date().toISOString(),
       changeLog: [],
+      isPersistenceEnabled: false, // Local storage is not the desired persistent state
     }
   }
 
@@ -134,6 +135,7 @@ export const getCurrentConfig = async () => {
     config: trackConfig,
     lastModified: new Date().toISOString(),
     changeLog: [],
+    isPersistenceEnabled: false, // Default config is not persistent
   }
 }
 
