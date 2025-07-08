@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { AlertCircle, Car, Info, Save, Send, Trash2 } from "lucide-react"
+import { AlertCircle, Car, Info, Save, Send, Trash2, RefreshCw } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { trackConfig } from "@/lib/track-config"
 import { toast } from "@/components/ui/use-toast"
@@ -69,9 +69,13 @@ export default function TrackClassCalculator() {
       try {
         console.log("Calculator: Loading configuration...")
         const currentData = await getCurrentConfig()
-        console.log("Calculator: Loaded data:", currentData)
-        setConfig(currentData.config)
-        setLastModified(currentData.lastModified || "")
+        if (currentData && currentData.config) {
+          console.log("Calculator: Loaded data:", currentData)
+          setConfig(currentData.config)
+          setLastModified(currentData.lastModified || "")
+        } else {
+          throw new Error("Failed to load configuration from server or local storage.")
+        }
       } catch (error) {
         console.error("Calculator: Error loading configuration:", error)
         toast({
@@ -87,8 +91,8 @@ export default function TrackClassCalculator() {
 
     loadConfig()
 
-    // Listen for configuration changes
-    const handleConfigUpdate = async (event: CustomEvent) => {
+    // Listen for configuration changes broadcast by the admin panel
+    const handleConfigUpdate = (event: CustomEvent) => {
       console.log("Calculator: Received config update event:", event.detail)
       setConfig(event.detail.config)
       setLastModified(event.detail.lastModified || "")
@@ -100,35 +104,10 @@ export default function TrackClassCalculator() {
 
     window.addEventListener("configUpdated", handleConfigUpdate as EventListener)
 
-    // Reduced polling frequency and smarter updates
-    const intervalId = setInterval(
-      async () => {
-        try {
-          console.log("Calculator: Polling for config updates...")
-          const updatedData = await getCurrentConfig()
-
-          // Only update if the lastModified timestamp is different
-          if (updatedData.lastModified && updatedData.lastModified !== lastModified) {
-            console.log("Calculator: Config timestamp changed, updating...")
-            setConfig(updatedData.config)
-            setLastModified(updatedData.lastModified)
-            toast({
-              title: "Configuration Updated",
-              description: "The configuration has been updated.",
-            })
-          }
-        } catch (error) {
-          console.error("Calculator: Error checking for config updates:", error)
-        }
-      },
-      60 * 1000, // Reduced to 60 seconds
-    )
-
     return () => {
       window.removeEventListener("configUpdated", handleConfigUpdate as EventListener)
-      clearInterval(intervalId)
     }
-  }, [lastModified]) // Add lastModified as dependency
+  }, []) // Run only once on mount
 
   // Get all available makes
   const makes = Object.keys(config.models)
@@ -200,7 +179,7 @@ export default function TrackClassCalculator() {
     let points = 0
     Object.entries(selectedMods).forEach(([category, items]) => {
       items.forEach((item) => {
-        points += config.scoreLookupTable[category][item] || 0
+        points += config.scoreLookupTable[category]?.[item] || 0
       })
     })
     return points
@@ -289,7 +268,7 @@ export default function TrackClassCalculator() {
   // Save current configuration
   const saveConfiguration = () => {
     const timestamp = new Date().toISOString()
-    const config = {
+    const configData = {
       make,
       model,
       baseClass,
@@ -300,12 +279,12 @@ export default function TrackClassCalculator() {
       finalClass,
       timestamp,
     }
-    setSavedConfigs((prev) => [config, ...prev])
+    setSavedConfigs((prev) => [configData, ...prev])
 
     // Save to localStorage
     try {
       const existingConfigs = JSON.parse(localStorage.getItem("savedConfigs") || "[]")
-      localStorage.setItem("savedConfigs", JSON.stringify([config, ...existingConfigs]))
+      localStorage.setItem("savedConfigs", JSON.stringify([configData, ...existingConfigs]))
 
       // Show success message
       toast({
@@ -336,15 +315,15 @@ export default function TrackClassCalculator() {
   }, [])
 
   // Load a saved configuration
-  const loadConfiguration = (config: any) => {
-    setMake(config.make)
-    setModel(config.model)
-    setBaseClass(config.baseClass)
-    setSelectedMods(config.mods)
-    setBaseClassPoints(config.baseClassPoints || 0)
-    setModificationPoints(config.modificationPoints || 0)
-    setTotalPoints(config.totalPoints)
-    setFinalClass(config.finalClass)
+  const loadConfiguration = (configData: any) => {
+    setMake(configData.make)
+    setModel(configData.model)
+    setBaseClass(configData.baseClass)
+    setSelectedMods(configData.mods)
+    setBaseClassPoints(configData.baseClassPoints || 0)
+    setModificationPoints(configData.modificationPoints || 0)
+    setTotalPoints(configData.totalPoints)
+    setFinalClass(configData.finalClass)
     setShowResults(true)
     setTiresError(false)
 
@@ -456,7 +435,7 @@ export default function TrackClassCalculator() {
     setIsSubmitting(true)
 
     try {
-      const config = savedConfigs[selectedConfigIndex]
+      const configData = savedConfigs[selectedConfigIndex]
       const timestamp = new Date().toISOString()
 
       // Combine first and last name for submission
@@ -468,14 +447,14 @@ export default function TrackClassCalculator() {
       // Map form fields to the correct entry IDs from your Google Form
       formData.append("entry.258378709", new Date().toISOString().split("T")[0]) // Current date for Effective Date
       formData.append("entry.163721629", fullName) // Driver Name (combined)
-      formData.append("entry.292301949", `${config.make} ${config.model}`) // Vehicle Make/Model
+      formData.append("entry.292301949", `${configData.make} ${configData.model}`) // Vehicle Make/Model
       formData.append("entry.1339041663", carNumber) // Car Number
       formData.append("entry.422981728", driverEmail) // Email Address
       formData.append("entry.1491829505", team || "N/A") // Team
-      formData.append("entry.2081807962", cleanBaseClass(config.baseClass)) // Base Class (without special indicators)
-      formData.append("entry.1533485464", config.finalClass) // Final Class
-      formData.append("entry.245375180", config.totalPoints.toString()) // Total Points
-      formData.append("entry.555215744", formatModificationsForSubmission(config.mods)) // Modifications only
+      formData.append("entry.2081807962", cleanBaseClass(configData.baseClass)) // Base Class (without special indicators)
+      formData.append("entry.1533485464", configData.finalClass) // Final Class
+      formData.append("entry.245375180", configData.totalPoints.toString()) // Total Points
+      formData.append("entry.555215744", formatModificationsForSubmission(configData.mods)) // Modifications only
 
       // Submit to the Google Form
       const formId = "1FAIpQLSfOULSPEv-xkaSdyK_sMcBfM1O3kqFah8BgpfJQbatlPffKFA"
@@ -512,7 +491,7 @@ export default function TrackClassCalculator() {
 
   // Get modification categories for tabs
   const getModificationCategories = () => {
-    return Object.keys(config.scoreLookupTable).filter(
+    return Object.keys(config.scoreLookupTable || {}).filter(
       (category) => category !== "classesScore" && Array.isArray(config[category]),
     )
   }
@@ -529,13 +508,17 @@ export default function TrackClassCalculator() {
     try {
       console.log("Manual refresh: Loading configuration...")
       const currentData = await getCurrentConfig()
-      console.log("Manual refresh: Loaded data:", currentData)
-      setConfig(currentData.config)
-      setLastModified(currentData.lastModified || "")
-      toast({
-        title: "Configuration Refreshed",
-        description: "Configuration has been refreshed from the server.",
-      })
+      if (currentData && currentData.config) {
+        console.log("Manual refresh: Loaded data:", currentData)
+        setConfig(currentData.config)
+        setLastModified(currentData.lastModified || "")
+        toast({
+          title: "Configuration Refreshed",
+          description: "Configuration has been refreshed from the server.",
+        })
+      } else {
+        throw new Error("Failed to get data from server.")
+      }
     } catch (error) {
       console.error("Manual refresh: Error loading configuration:", error)
       toast({
@@ -548,7 +531,7 @@ export default function TrackClassCalculator() {
     }
   }
 
-  if (isLoading) {
+  if (isLoading && !config.models) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -566,6 +549,7 @@ export default function TrackClassCalculator() {
           {lastModified && `Last updated: ${new Date(lastModified).toLocaleString()}`}
         </div>
         <Button variant="outline" onClick={refreshConfiguration} disabled={isLoading}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           {isLoading ? "Refreshing..." : "Refresh Config"}
         </Button>
       </div>
@@ -744,7 +728,7 @@ export default function TrackClassCalculator() {
                                 {/* Extract the full description without the last points part */}
                                 {item.substring(0, item.lastIndexOf("(")).trim()}
                                 <Badge className="ml-2 bg-gray-700">
-                                  {config.scoreLookupTable[category][item] > 0
+                                  {(config.scoreLookupTable[category]?.[item] ?? 0) > 0
                                     ? `+${config.scoreLookupTable[category][item]}`
                                     : config.scoreLookupTable[category][item]}{" "}
                                   points
@@ -853,37 +837,37 @@ export default function TrackClassCalculator() {
               ) : (
                 <ScrollArea className={`${isMobile ? "h-[350px]" : "h-[400px]"}`}>
                   <div className="space-y-4">
-                    {savedConfigs.map((config, index) => (
+                    {savedConfigs.map((configData, index) => (
                       <div key={index} className="p-4 bg-black border border-[#fec802]/30 rounded-lg">
                         <div className={`flex ${isMobile ? "flex-col" : "justify-between"} items-start`}>
                           <div>
                             <h3 className="font-medium">
-                              {config.make} {config.model}
+                              {configData.make} {configData.model}
                             </h3>
                             <p className="text-sm text-gray-400">
-                              {new Date(config.timestamp).toLocaleDateString()} at{" "}
-                              {new Date(config.timestamp).toLocaleTimeString()}
+                              {new Date(configData.timestamp).toLocaleDateString()} at{" "}
+                              {new Date(configData.timestamp).toLocaleTimeString()}
                             </p>
                           </div>
                           <div className={`flex gap-2 ${isMobile ? "mt-2" : ""}`}>
-                            <Badge className={`${getClassColor(cleanBaseClass(config.baseClass))} text-white`}>
-                              Base: {cleanBaseClass(config.baseClass)}
+                            <Badge className={`${getClassColor(cleanBaseClass(configData.baseClass))} text-white`}>
+                              Base: {cleanBaseClass(configData.baseClass)}
                             </Badge>
-                            <Badge className={`${getClassColor(config.finalClass)} text-white`}>
-                              Final: {config.finalClass}
+                            <Badge className={`${getClassColor(configData.finalClass)} text-white`}>
+                              Final: {configData.finalClass}
                             </Badge>
                           </div>
                         </div>
                         <Separator className="my-2" />
                         <div className="flex justify-between items-center">
                           <div className="text-sm">
-                            <p>Total Points: {config.totalPoints}</p>
+                            <p>Total Points: {configData.totalPoints}</p>
                           </div>
                           <div className="flex gap-2">
                             <Button
                               variant="link"
                               className="p-0 h-auto text-[#fec802] text-sm"
-                              onClick={() => loadConfiguration(config)}
+                              onClick={() => loadConfiguration(configData)}
                             >
                               Load Configuration
                             </Button>
@@ -943,7 +927,7 @@ export default function TrackClassCalculator() {
                         value={selectedConfigIndex !== null ? selectedConfigIndex.toString() : undefined}
                         onValueChange={(value) => setSelectedConfigIndex(Number.parseInt(value))}
                       >
-                        {savedConfigs.map((config, index) => (
+                        {savedConfigs.map((configData, index) => (
                           <div
                             key={index}
                             className="flex items-start space-x-2 p-4 border rounded-lg border-[#fec802]/30 bg-black"
@@ -951,19 +935,21 @@ export default function TrackClassCalculator() {
                             <RadioGroupItem value={index.toString()} id={`config-${index}`} />
                             <div className="grid gap-1.5 leading-none w-full">
                               <Label htmlFor={`config-${index}`} className="text-base font-medium">
-                                {config.make} {config.model}
+                                {configData.make} {configData.model}
                               </Label>
                               <div className={`flex ${isMobile ? "flex-col" : "justify-between"} items-start mt-2`}>
                                 <div className="text-sm text-gray-400">
-                                  {new Date(config.timestamp).toLocaleDateString()} at{" "}
-                                  {new Date(config.timestamp).toLocaleTimeString()}
+                                  {new Date(configData.timestamp).toLocaleDateString()} at{" "}
+                                  {new Date(configData.timestamp).toLocaleTimeString()}
                                 </div>
                                 <div className={`flex gap-2 ${isMobile ? "mt-1" : ""}`}>
-                                  <Badge className={`${getClassColor(cleanBaseClass(config.baseClass))} text-white`}>
-                                    Base: {cleanBaseClass(config.baseClass)}
+                                  <Badge
+                                    className={`${getClassColor(cleanBaseClass(configData.baseClass))} text-white`}
+                                  >
+                                    Base: {cleanBaseClass(configData.baseClass)}
                                   </Badge>
-                                  <Badge className={`${getClassColor(config.finalClass)} text-white`}>
-                                    Final: {config.finalClass}
+                                  <Badge className={`${getClassColor(configData.finalClass)} text-white`}>
+                                    Final: {configData.finalClass}
                                   </Badge>
                                 </div>
                               </div>

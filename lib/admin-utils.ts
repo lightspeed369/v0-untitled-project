@@ -16,7 +16,11 @@ export const saveConfigToServer = async (
     let changeDetails = action
     if (oldConfig) {
       const changes = generateChangeDescription(oldConfig, config)
-      changeDetails = changes.join("; ")
+      if (changes.length > 0) {
+        changeDetails = changes.join("; ")
+      } else {
+        changeDetails = "No changes detected, saved with current timestamp."
+      }
     }
 
     const response = await fetch("/api/config", {
@@ -29,7 +33,6 @@ export const saveConfigToServer = async (
         adminId,
         action,
         changeDetails,
-        timestamp: new Date().toISOString(),
       }),
     })
 
@@ -55,13 +58,11 @@ export const loadConfigFromServer = async () => {
 
     const response = await fetch("/api/config", {
       cache: "no-store", // Ensure we always get fresh data
-      headers: {
-        "Cache-Control": "no-cache",
-      },
     })
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch configuration: ${response.status} ${response.statusText}`)
+      const errorData = await response.json()
+      throw new Error(errorData.message || `Failed to fetch configuration: ${response.status}`)
     }
 
     const data = await response.json()
@@ -138,7 +139,7 @@ export const getCurrentConfig = async () => {
 
 // Function to extract points from a modification string
 export const extractPointsFromMod = (mod: string) => {
-  const match = mod.match(/$$(-?\d+)$$/)
+  const match = mod.match(/$$(-?\d+)$$$/)
   if (match && match[1]) {
     return Number.parseInt(match[1], 10)
   }
@@ -196,6 +197,8 @@ export const broadcastConfigChange = (config: any, lastModified?: string) => {
 // Function to compare configurations and generate detailed change descriptions
 export const generateChangeDescription = (oldConfig: any, newConfig: any) => {
   const changes: string[] = []
+
+  if (!oldConfig || !newConfig) return ["Initial configuration setup."]
 
   // Compare models (makes and models)
   const oldMakes = Object.keys(oldConfig.models || {})
@@ -262,32 +265,32 @@ export const generateChangeDescription = (oldConfig: any, newConfig: any) => {
   // Check for changes within existing categories
   const commonCategories = oldCategories.filter((cat) => newCategories.includes(cat))
   commonCategories.forEach((category) => {
-    const oldMods = Object.keys(oldConfig.scoreLookupTable[category] || {})
-    const newMods = Object.keys(newConfig.scoreLookupTable[category] || {})
+    const oldMods = oldConfig[category] || []
+    const newMods = newConfig[category] || []
 
     // Check for added modifications
-    const addedMods = newMods.filter((mod) => !oldMods.includes(mod))
-    addedMods.forEach((mod) => {
-      const points = newConfig.scoreLookupTable[category][mod]
-      changes.push(`Added modification: ${category} - ${mod} (${points} points)`)
+    const addedMods = newMods.filter((mod: string) => !oldMods.includes(mod))
+    addedMods.forEach((mod: string) => {
+      const points = newConfig.scoreLookupTable[category]?.[mod] ?? "N/A"
+      changes.push(`Added mod to ${category}: ${mod} (${points} pts)`)
     })
 
     // Check for removed modifications
-    const removedMods = oldMods.filter((mod) => !newMods.includes(mod))
-    removedMods.forEach((mod) => {
-      changes.push(`Removed modification: ${category} - ${mod}`)
+    const removedMods = oldMods.filter((mod: string) => !newMods.includes(mod))
+    removedMods.forEach((mod: string) => {
+      changes.push(`Removed mod from ${category}: ${mod}`)
     })
 
     // Check for modified modifications (point changes)
-    const commonMods = oldMods.filter((mod) => newMods.includes(mod))
-    commonMods.forEach((mod) => {
-      const oldPoints = oldConfig.scoreLookupTable[category][mod]
-      const newPoints = newConfig.scoreLookupTable[category][mod]
+    const commonMods = oldMods.filter((mod: string) => newMods.includes(mod))
+    commonMods.forEach((mod: string) => {
+      const oldPoints = oldConfig.scoreLookupTable[category]?.[mod]
+      const newPoints = newConfig.scoreLookupTable[category]?.[mod]
       if (oldPoints !== newPoints) {
-        changes.push(`Modified modification: ${category} - ${mod} (${oldPoints} → ${newPoints} points)`)
+        changes.push(`Modified mod in ${category}: ${mod} (${oldPoints} → ${newPoints} pts)`)
       }
     })
   })
 
-  return changes.length > 0 ? changes : ["General configuration update"]
+  return changes
 }
