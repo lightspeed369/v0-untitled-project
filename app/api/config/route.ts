@@ -1,21 +1,21 @@
 import { NextResponse } from "next/server"
-import { readConfigFromFile, writeConfigToFile } from "./fs-store"
+import { readConfigFromKV, writeConfigToKV } from "./kv-store"
 
-// Get the current configuration from the file
+// Get the current configuration from Vercel KV
 export async function GET() {
   try {
-    const { config, lastModified, changeLog } = await readConfigFromFile()
+    const { config, lastModified, changeLog } = await readConfigFromKV()
     return NextResponse.json({ config, lastModified, changeLog })
   } catch (error: any) {
-    console.error("Error reading config from file in GET:", error)
+    console.error("Error in GET /api/config:", error)
     return NextResponse.json(
-      { success: false, message: "Failed to read configuration", error: error.message },
+      { success: false, message: "Failed to read configuration from KV store.", error: error.message },
       { status: 500 },
     )
   }
 }
 
-// Update the configuration in the file
+// Update the configuration in Vercel KV
 export async function POST(request: Request) {
   try {
     const {
@@ -25,14 +25,18 @@ export async function POST(request: Request) {
       changeDetails,
     } = await request.json()
 
-    const updatedData = await writeConfigToFile({
+    if (!newConfig) {
+      return NextResponse.json({ success: false, message: "No configuration data provided." }, { status: 400 })
+    }
+
+    const updatedData = await writeConfigToKV({
       config: newConfig,
       adminId,
       action,
       changeDetails,
     })
 
-    console.log("Configuration updated successfully by:", adminId)
+    console.log("Configuration updated successfully in KV by:", adminId)
 
     return NextResponse.json({
       success: true,
@@ -41,9 +45,9 @@ export async function POST(request: Request) {
       changeLog: updatedData.changeLog,
     })
   } catch (error: any) {
-    console.error("Error updating config in POST:", error)
+    console.error("Error in POST /api/config:", error)
     return NextResponse.json(
-      { success: false, message: "Failed to update configuration", error: error.message },
+      { success: false, message: "Failed to update configuration in KV store.", error: error.message },
       { status: 500 },
     )
   }

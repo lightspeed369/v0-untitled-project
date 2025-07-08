@@ -57,7 +57,7 @@ export default function AdminPage() {
       try {
         const currentData = await getCurrentConfig()
         setConfig(currentData.config)
-        setOriginalConfig(currentData.config) // Store original for comparison
+        setOriginalConfig(JSON.parse(JSON.stringify(currentData.config))) // Deep copy for comparison
         setChangeLog(currentData.changeLog || [])
         setLastModified(currentData.lastModified || "")
       } catch (error) {
@@ -446,7 +446,7 @@ export default function AdminPage() {
       }
 
       // Update original config to current config for next comparison
-      setOriginalConfig({ ...config })
+      setOriginalConfig(JSON.parse(JSON.stringify(config))) // Deep copy
 
       // Broadcast the configuration change
       broadcastConfigChange(config, serverResult.data?.timestamp)
@@ -461,9 +461,8 @@ export default function AdminPage() {
       toast({
         variant: "destructive",
         title: "Server save failed",
-        description: localSuccess
-          ? `Changes were saved locally but failed to save to the server: ${serverResult.error || "Unknown error"}. Only you will see these changes.`
-          : `There was an error saving your configuration: ${serverResult.error || "Unknown error"}. Please try again.`,
+        description: `Failed to save to server: ${serverResult.error || "Unknown error"}. Please check console for details.`,
+        duration: 9000,
       })
     }
   }
@@ -953,14 +952,14 @@ export default function AdminPage() {
                               <div className="text-sm text-gray-300">
                                 <strong>Changes Made:</strong>
                                 <div className="mt-2 pl-4 border-l-2 border-[#fec802]/30">
-                                  {entry.changeDetails ? (
-                                    entry.changeDetails.split("; ").map((change, changeIndex) => (
+                                  {entry.details ? (
+                                    entry.details.split("; ").map((change, changeIndex) => (
                                       <div key={changeIndex} className="py-1">
                                         • {change}
                                       </div>
                                     ))
                                   ) : (
-                                    <div className="py-1">• {entry.details}</div>
+                                    <div className="py-1">• No specific changes recorded.</div>
                                   )}
                                 </div>
                               </div>
