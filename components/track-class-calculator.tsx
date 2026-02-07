@@ -61,12 +61,6 @@ export default function TrackClassCalculator() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [submissionSuccess, setSubmissionSuccess] = useState<boolean>(false)
 
-  // Keep a ref to the latest config for the polling interval
-  const configRef = useRef(config)
-  useEffect(() => {
-    configRef.current = config
-  }, [config])
-
   // Load configuration on component mount
   useEffect(() => {
     const loadConfig = async () => {
@@ -106,7 +100,7 @@ export default function TrackClassCalculator() {
         try {
           const updatedConfig = await getCurrentConfig()
           // Only update if the config has actually changed
-          if (JSON.stringify(updatedConfig) !== JSON.stringify(configRef.current)) {
+          if (JSON.stringify(updatedConfig) !== JSON.stringify(config)) {
             setConfig(updatedConfig)
             toast({
               title: "Configuration Updated",
