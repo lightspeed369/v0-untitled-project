@@ -51,6 +51,28 @@ export default function AdminPage() {
   const [adminId, setAdminId] = useState("admin")
   const [isPersistenceEnabled, setIsPersistenceEnabled] = useState(true)
 
+  // Restore an existing admin session on mount so a page reload doesn't force a
+  // re-login, and warn early if the server has no admin password configured.
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const response = await fetch("/api/admin/session", { cache: "no-store" })
+        const data = await response.json()
+        if (data.authenticated) setIsAuthenticated(true)
+        if (!data.authConfigured) {
+          toast({
+            variant: "destructive",
+            title: "Admin access not configured",
+            description: "ADMIN_PASSWORD is not set on the server, so configuration cannot be saved.",
+          })
+        }
+      } catch (error) {
+        console.error("Error checking session:", error)
+      }
+    }
+    restoreSession()
+  }, [])
+
   // Load configuration on component mount
   useEffect(() => {
     const loadConfig = async () => {
@@ -110,27 +132,49 @@ export default function AdminPage() {
     }
   }
 
-  // Handle authentication
-  const handleAuthenticate = () => {
-    // In a real application, you would use a secure authentication method
-    // For this demo, we're using a simple password check
-    if (password === "admin123") {
-      setIsAuthenticated(true)
-      toast({
-        title: "Authentication successful",
-        description: "You are now logged in as an administrator.",
+  // Handle authentication.
+  // The password is verified server-side; it is never compared in the browser and
+  // never shipped in the client bundle. On success the server sets an httpOnly
+  // session cookie, which is what actually authorises writes to /api/config.
+  const handleAuthenticate = async () => {
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
       })
-    } else {
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setIsAuthenticated(true)
+        setPassword("")
+        toast({
+          title: "Authentication successful",
+          description: "You are now logged in as an administrator.",
+        })
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Authentication failed",
+          description: data.message || "Invalid password. Please try again.",
+        })
+      }
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Authentication failed",
-        description: "Invalid password. Please try again.",
+        description: `Could not reach the server: ${error}`,
       })
     }
   }
 
-  // Handle logout
-  const handleLogout = () => {
+  // Handle logout — clears the server session cookie too, not just local state.
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/admin/session", { method: "DELETE" })
+    } catch (error) {
+      console.error("Error clearing session:", error)
+    }
     setIsAuthenticated(false)
     setPassword("")
   }
@@ -463,7 +507,7 @@ export default function AdminPage() {
       toast({
         variant: "destructive",
         title: "Server save failed",
-        description: `Failed to save to server: ${serverResult.error || "Unknown error"}. If persistence is disabled, please add the Vercel KV integration.`,
+        description: `Failed to save to server: ${serverResult.error || "Unknown error"}. If persistence is disabled, check that a writable volume is mounted at DATA_DIR.`,
         duration: 9000,
       })
     }
@@ -536,8 +580,8 @@ export default function AdminPage() {
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Persistence is Disabled</AlertTitle>
               <AlertDescription>
-                The server is not configured with a Vercel KV store. Any changes you make will be lost when the server
-                restarts. Please add the Vercel KV integration to enable persistent storage.
+                The server's data directory is not writable, so any changes you make will be lost when the server
+                restarts. Check that a persistent volume is mounted and that DATA_DIR points at it.
               </AlertDescription>
             </Alert>
           )}
