@@ -7,13 +7,12 @@ import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
-// Next 15 no longer reads `viewport` from the metadata export; it needs its own
-// export. Values are carried over unchanged so mobile rendering is identical.
+// Next 15 no longer reads `viewport` from the metadata export; it needs its own export.
+// maximumScale/userScalable are intentionally omitted: pinch-zoom is allowed so drivers
+// can zoom in on the classification result on a phone at the track.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 }
 
 export const metadata: Metadata = {

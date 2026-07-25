@@ -153,34 +153,34 @@
         "Camaro SS (6h Gen 1LE)": {
           "baseClass": "TTC$"
         },
-        "Corvetts C5/C6": {
+        "Corvette C5/C6": {
           "baseClass": "TTC"
         },
-        "Corvetts C6 Z06 & GS": {
+        "Corvette C6 Z06 & GS": {
           "baseClass": "TTC*"
         },
-        "Corvetts C7 Z06": {
+        "Corvette C7 Z06": {
           "baseClass": "TTB*"
         },
-        "Corvetts C7 Base/Z51/GS ": {
+        "Corvette C7 Base/Z51/GS ": {
           "baseClass": "TTB"
         },
-        "Corvetts C7 ZR1": {
+        "Corvette C7 ZR1": {
           "baseClass": "TTA"
         },
-        "Corvetts C8 (inc. Z51)": {
+        "Corvette C8 (inc. Z51)": {
           "baseClass": "TTB"
         },
-        "Corvetts C8 Z06": {
+        "Corvette C8 Z06": {
           "baseClass": "TTA"
         },
         "Camaro 2.0 (6th Gen)": {
           "baseClass": "TTD"
         },
-        "Corvetts C8 Z06 Z07": {
+        "Corvette C8 Z06 Z07": {
           "baseClass": "TTA*"
         },
-        "Corvetts C8 ZR1": {
+        "Corvette C8 ZR1": {
           "baseClass": "TTX"
         }
       },
