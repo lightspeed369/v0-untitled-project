@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { readVersion, restoreVersion } from "../../store"
-import { SESSION_COOKIE, isAuthConfigured, verifySessionToken } from "@/lib/auth"
+import { ADMIN_ID, SESSION_COOKIE, isAuthConfigured, verifySessionToken } from "@/lib/auth"
 
 const requireAdmin = async () => {
   if (!isAuthConfigured()) {
@@ -33,22 +33,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 /** Roll the live configuration back to this version. */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const denied = await requireAdmin()
   if (denied) return denied
 
   const { id } = await params
 
-  let adminId = "admin"
   try {
-    const body = await request.json()
-    if (typeof body?.adminId === "string" && body.adminId.trim()) adminId = body.adminId.trim()
-  } catch {
-    // No body is fine; fall back to the default admin label.
-  }
-
-  try {
-    const restored = await restoreVersion(id, adminId)
+    // Server-stamped, same as ordinary saves — not read from the request body.
+    const restored = await restoreVersion(id, ADMIN_ID)
     if (!restored) {
       return NextResponse.json({ success: false, message: "Version not found." }, { status: 404 })
     }

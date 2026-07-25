@@ -48,7 +48,7 @@ export default function AdminPage() {
   const [editModName, setEditModName] = useState("")
   const [editModPoints, setEditModPoints] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
-  const [adminId, setAdminId] = useState("admin")
+  const [adminId] = useState("lsadmin")
   const [isPersistenceEnabled, setIsPersistenceEnabled] = useState(true)
   const [versions, setVersions] = useState<any[]>([])
   const [isRestoring, setIsRestoring] = useState<string | null>(null)
@@ -115,11 +115,11 @@ export default function AdminPage() {
         title: "Server Status",
         description: (
           <div className="space-y-2 mt-2">
-            <p>Data directory exists: {status.dataDirectoryExists ? "✅" : "❌"}</p>
-            <p>Data directory writable: {status.dataDirectoryWritable ? "✅" : "❌"}</p>
+            <p>Data directory: {status.dataDir}</p>
+            <p>Directory exists: {status.dataDirectoryExists ? "✅" : "❌"}</p>
+            <p>Directory writable: {status.dataDirectoryWritable ? "✅" : "❌"}</p>
             <p>Config file exists: {status.configFileExists ? "✅" : "❌"}</p>
-            <p>Config file readable: {status.configFileReadable ? "✅" : "❌"}</p>
-            <p>Config file writable: {status.configFileWritable ? "✅" : "❌"}</p>
+            <p>Changes persist: {status.isPersistenceEnabled ? "✅" : "❌"}</p>
             <p>Server time: {new Date(status.serverTime).toLocaleString()}</p>
           </div>
         ),
@@ -655,12 +655,9 @@ export default function AdminPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="admin-id">Admin ID</Label>
-                  <Input
-                    id="admin-id"
-                    placeholder="Enter your admin ID"
-                    value={adminId}
-                    onChange={(e) => setAdminId(e.target.value)}
-                  />
+                  {/* Fixed: there is one admin identity and the server stamps it on
+                      every change, so this is shown for information only. */}
+                  <Input id="admin-id" value={adminId} readOnly disabled />
                 </div>
                 <div className="flex gap-4">
                   <Input

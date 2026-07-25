@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { readConfig, writeConfig } from "./store"
-import { SESSION_COOKIE, isAuthConfigured, verifySessionToken } from "@/lib/auth"
+import { ADMIN_ID, SESSION_COOKIE, isAuthConfigured, verifySessionToken } from "@/lib/auth"
 
 // Reading the config is public: the calculator itself is public and needs it.
 export async function GET() {
@@ -39,12 +39,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const {
-      config: newConfig,
-      adminId = "admin",
-      action = "Configuration updated",
-      changeDetails,
-    } = await request.json()
+    // adminId is deliberately NOT taken from the request: there is one admin identity
+    // and the server stamps it, so change-log attribution can't be spoofed.
+    const { config: newConfig, action = "Configuration updated", changeDetails } = await request.json()
+    const adminId = ADMIN_ID
 
     if (!newConfig || typeof newConfig !== "object") {
       return NextResponse.json({ success: false, message: "No configuration data provided." }, { status: 400 })

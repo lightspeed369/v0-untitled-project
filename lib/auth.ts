@@ -8,6 +8,14 @@
 import crypto from "crypto"
 
 export const SESSION_COOKIE = "ls_admin_session"
+
+/**
+ * The single admin identity. Stamped on change-log entries and version snapshots.
+ *
+ * The server applies this itself rather than trusting an adminId sent by the browser,
+ * so the attribution in the change log cannot be forged by hand-crafting a request.
+ */
+export const ADMIN_ID = "lsadmin"
 const DEFAULT_TTL_MS = 8 * 60 * 60 * 1000 // 8 hours
 
 const sha256 = (value: string) => crypto.createHash("sha256").update(value, "utf8").digest()
