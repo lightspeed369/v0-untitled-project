@@ -10,7 +10,10 @@ WORKDIR /app
 
 # --- dependencies ---------------------------------------------------------
 FROM base AS deps
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml is required here, not optional: it carries `allowBuilds`, which
+# pnpm 11 reads instead of package.json's `pnpm.onlyBuiltDependencies`. Without it the
+# install aborts with ERR_PNPM_IGNORED_BUILDS on sharp's postinstall.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # --- build ----------------------------------------------------------------
