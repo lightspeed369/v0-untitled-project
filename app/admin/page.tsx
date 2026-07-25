@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "@/components/ui/use-toast"
-import { Check, Edit, Lock, Save, X, History, Clock, AlertTriangle } from "lucide-react"
+import { Check, Edit, Lock, Save, X, History, Clock, AlertTriangle, RotateCcw } from "lucide-react"
 import {
   getCurrentConfig,
   saveConfigToServer,
@@ -50,6 +50,9 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [adminId, setAdminId] = useState("admin")
   const [isPersistenceEnabled, setIsPersistenceEnabled] = useState(true)
+  const [versions, setVersions] = useState<any[]>([])
+  const [isRestoring, setIsRestoring] = useState<string | null>(null)
+  const [confirmRestoreId, setConfirmRestoreId] = useState<string | null>(null)
 
   // Restore an existing admin session on mount so a page reload doesn't force a
   // re-login, and warn early if the server has no admin password configured.
@@ -165,6 +168,63 @@ export default function AdminPage() {
         title: "Authentication failed",
         description: `Could not reach the server: ${error}`,
       })
+    }
+  }
+
+  // Version history is admin-only, so it can only be fetched once authenticated.
+  const loadVersions = async () => {
+    try {
+      const response = await fetch("/api/config/versions", { cache: "no-store" })
+      if (!response.ok) return
+      const data = await response.json()
+      setVersions(data.versions || [])
+    } catch (error) {
+      console.error("Error loading versions:", error)
+    }
+  }
+
+  useEffect(() => {
+    if (isAuthenticated) loadVersions()
+  }, [isAuthenticated])
+
+  // Roll the live configuration back to an earlier snapshot. The server treats this
+  // as an ordinary write, so the current state is snapshotted first and this restore
+  // is itself undoable.
+  const handleRestoreVersion = async (versionId: string) => {
+    setIsRestoring(versionId)
+    try {
+      const response = await fetch(`/api/config/versions/${versionId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminId }),
+      })
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        const refreshed = await getCurrentConfig()
+        setConfig(refreshed.config)
+        setOriginalConfig(JSON.parse(JSON.stringify(refreshed.config)))
+        setChangeLog(refreshed.changeLog || [])
+        setLastModified(refreshed.lastModified || "")
+        saveConfigToStorage(refreshed.config, refreshed.lastModified)
+        broadcastConfigChange(refreshed.config, refreshed.lastModified)
+        await loadVersions()
+        toast({
+          title: "Configuration restored",
+          description: "The earlier version is now live. This restore can itself be undone.",
+        })
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Restore failed",
+          description: data.message || "Could not restore that version.",
+        })
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Restore failed", description: String(error) })
+    } finally {
+      setIsRestoring(null)
+      setConfirmRestoreId(null)
     }
   }
 
@@ -618,7 +678,7 @@ export default function AdminPage() {
             </div>
           ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-black border border-[#fec802]/30">
+              <TabsList className="grid w-full grid-cols-4 bg-black border border-[#fec802]/30">
                 <TabsTrigger value="cars" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
                   Car Makes & Models
                 </TabsTrigger>
@@ -631,6 +691,13 @@ export default function AdminPage() {
                 >
                   <History className="h-4 w-4 mr-2" />
                   Change Log
+                </TabsTrigger>
+                <TabsTrigger
+                  value="versions"
+                  className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Versions
                 </TabsTrigger>
               </TabsList>
 
@@ -1019,6 +1086,105 @@ export default function AdminPage() {
                                   )}
                                 </div>
                               </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="versions" className="space-y-6 mt-4">
+                <Card className="border-[#fec802]/30 bg-black">
+                  <CardHeader className="border-b border-[#fec802]/30">
+                    <CardTitle className="flex items-center gap-2">
+                      <RotateCcw className="h-5 w-5 text-[#fec802]" />
+                      Previous Versions
+                    </CardTitle>
+                    <CardDescription>
+                      A copy of the configuration is kept every time it is saved. Restoring one puts it
+                      back live — and because a restore is saved like any other change, you can undo it too.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    {versions.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400">
+                        <p>No previous versions yet.</p>
+                        <p className="text-sm mt-2">
+                          The first one is created the next time you save a change.
+                        </p>
+                      </div>
+                    ) : (
+                      <ScrollArea className="h-[500px] pr-4">
+                        <div className="space-y-4">
+                          {versions.map((version) => (
+                            <div
+                              key={version.id}
+                              className="p-4 bg-black border border-[#fec802]/30 rounded-lg"
+                            >
+                              <div className="flex justify-between items-start mb-3 gap-4">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-4 w-4 text-[#fec802]" />
+                                  <span className="font-medium text-[#fec802]">
+                                    {version.savedAt ? new Date(version.savedAt).toLocaleString() : version.id}
+                                  </span>
+                                </div>
+                                <span className="text-sm text-gray-400 whitespace-nowrap">
+                                  {version.makeCount} makes · {version.modelCount} models
+                                </span>
+                              </div>
+
+                              {version.adminId && (
+                                <p className="text-sm text-gray-400 mb-2">
+                                  <strong>Replaced by:</strong> {version.adminId}
+                                </p>
+                              )}
+
+                              {version.note && (
+                                <div className="text-sm text-gray-300 mb-3">
+                                  <strong>Superseded by:</strong>
+                                  <div className="mt-2 pl-4 border-l-2 border-[#fec802]/30 text-gray-400">
+                                    {version.note}
+                                  </div>
+                                </div>
+                              )}
+
+                              {confirmRestoreId === version.id ? (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm text-gray-300">
+                                    Replace the live configuration with this version?
+                                  </span>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleRestoreVersion(version.id)}
+                                    disabled={isRestoring === version.id}
+                                    className="bg-[#fec802] text-black hover:bg-[#fec802]/80"
+                                  >
+                                    <Check className="h-4 w-4 mr-1" />
+                                    {isRestoring === version.id ? "Restoring…" : "Yes, restore"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setConfirmRestoreId(null)}
+                                    disabled={isRestoring === version.id}
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Cancel
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setConfirmRestoreId(version.id)}
+                                  className="border-[#fec802]/30"
+                                >
+                                  <RotateCcw className="h-4 w-4 mr-1" />
+                                  Restore this version
+                                </Button>
+                              )}
                             </div>
                           ))}
                         </div>

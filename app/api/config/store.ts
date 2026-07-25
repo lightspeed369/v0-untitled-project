@@ -17,7 +17,10 @@ import { generateChangeDescription } from "@/lib/change-description"
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data")
 const CONFIG_FILE = path.join(DATA_DIR, "config.json")
 const SEED_FILE = path.join(process.cwd(), "data", "config.seed.json")
+const VERSIONS_DIR = path.join(DATA_DIR, "versions")
 const MAX_CHANGELOG_ENTRIES = 50
+/** How many previous configurations to keep for rollback. */
+const MAX_VERSIONS = 20
 
 export interface ConfigData {
   config: any
@@ -28,6 +31,18 @@ export interface ConfigData {
     details: string
     adminId?: string
   }>
+}
+
+/** A point-in-time copy of the configuration, written before it is overwritten. */
+export interface VersionSummary {
+  id: string
+  savedAt: string
+  lastModified: string
+  makeCount: number
+  modelCount: number
+  /** What replaced this version — i.e. why it stopped being current. */
+  note: string
+  adminId: string
 }
 
 /** Used only when the disk is unwritable, so the app degrades instead of erroring. */
@@ -100,6 +115,163 @@ const writeAtomic = async (data: ConfigData): Promise<void> => {
   await fs.rename(temp, CONFIG_FILE)
 }
 
+// --- version snapshots -----------------------------------------------------
+
+/**
+ * Version ids come from the URL, so they are never used to build a path directly.
+ * Only this exact shape is accepted, which cannot contain a separator or "..".
+ */
+const VERSION_ID_PATTERN = /^v-[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{3}Z(-[0-9]+)?$/
+
+const isValidVersionId = (id: string): boolean => VERSION_ID_PATTERN.test(id)
+
+const versionPath = (id: string): string | null => {
+  if (!isValidVersionId(id)) return null
+  const file = path.join(VERSIONS_DIR, `${id}.json`)
+  // Belt and braces: the resolved path must still sit inside VERSIONS_DIR.
+  if (path.dirname(path.resolve(file)) !== path.resolve(VERSIONS_DIR)) return null
+  return file
+}
+
+const countModels = (config: any): { makeCount: number; modelCount: number } => {
+  const models = config?.models && typeof config.models === "object" ? config.models : {}
+  const makes = Object.keys(models)
+  return {
+    makeCount: makes.length,
+    modelCount: makes.reduce((n, mk) => n + Object.keys(models[mk] || {}).length, 0),
+  }
+}
+
+/** Delete all but the newest MAX_VERSIONS snapshots. */
+const pruneVersions = async (): Promise<void> => {
+  try {
+    const files = (await fs.readdir(VERSIONS_DIR)).filter((f) => f.endsWith(".json")).sort()
+    const stale = files.slice(0, Math.max(0, files.length - MAX_VERSIONS))
+    await Promise.all(stale.map((f) => fs.unlink(path.join(VERSIONS_DIR, f)).catch(() => {})))
+  } catch {
+    // No versions directory yet, or unreadable — nothing to prune.
+  }
+}
+
+/**
+ * Copy the current configuration aside before it is replaced.
+ *
+ * Failures are logged but never thrown: losing the ability to roll back is bad,
+ * but blocking a legitimate edit because the snapshot failed is worse.
+ */
+const snapshotCurrent = async (current: ConfigData, note: string, adminId: string): Promise<void> => {
+  try {
+    await fs.mkdir(VERSIONS_DIR, { recursive: true })
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-")
+    let id = `v-${stamp}`
+    let attempt = 0
+    // Two saves inside the same millisecond would collide; disambiguate.
+    while (attempt < 100) {
+      const candidate = attempt === 0 ? id : `${id}-${attempt}`
+      const file = versionPath(candidate)
+      if (!file) break
+      try {
+        await fs.access(file)
+        attempt += 1
+      } catch {
+        id = candidate
+        const { makeCount, modelCount } = countModels(current.config)
+        const payload = {
+          id,
+          savedAt: new Date().toISOString(),
+          lastModified: current.lastModified,
+          makeCount,
+          modelCount,
+          note,
+          adminId,
+          config: current.config,
+        }
+        const temp = `${file}.tmp`
+        await fs.writeFile(temp, JSON.stringify(payload, null, 2), "utf8")
+        await fs.rename(temp, file)
+        await pruneVersions()
+        return
+      }
+    }
+  } catch (error) {
+    console.error("[config] could not snapshot the previous configuration:", error)
+  }
+}
+
+/** Newest first. */
+export const listVersions = async (): Promise<VersionSummary[]> => {
+  let files: string[]
+  try {
+    files = (await fs.readdir(VERSIONS_DIR)).filter((f) => f.endsWith(".json"))
+  } catch {
+    return []
+  }
+
+  const summaries: VersionSummary[] = []
+  for (const file of files) {
+    try {
+      const raw = JSON.parse(await fs.readFile(path.join(VERSIONS_DIR, file), "utf8"))
+      const counts = countModels(raw.config)
+      summaries.push({
+        id: raw.id ?? file.replace(/\.json$/, ""),
+        savedAt: raw.savedAt ?? "",
+        lastModified: raw.lastModified ?? "",
+        makeCount: raw.makeCount ?? counts.makeCount,
+        modelCount: raw.modelCount ?? counts.modelCount,
+        note: raw.note ?? "",
+        adminId: raw.adminId ?? "",
+      })
+    } catch {
+      // Skip an unreadable snapshot rather than failing the whole listing.
+    }
+  }
+  return summaries.sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1))
+}
+
+/** Read one snapshot's stored configuration. Returns null for unknown/invalid ids. */
+export const readVersion = async (id: string): Promise<{ summary: VersionSummary; config: any } | null> => {
+  const file = versionPath(id)
+  if (!file) return null
+  try {
+    const raw = JSON.parse(await fs.readFile(file, "utf8"))
+    if (!raw?.config) return null
+    const counts = countModels(raw.config)
+    return {
+      summary: {
+        id: raw.id ?? id,
+        savedAt: raw.savedAt ?? "",
+        lastModified: raw.lastModified ?? "",
+        makeCount: raw.makeCount ?? counts.makeCount,
+        modelCount: raw.modelCount ?? counts.modelCount,
+        note: raw.note ?? "",
+        adminId: raw.adminId ?? "",
+      },
+      config: raw.config,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Roll back to a stored version.
+ *
+ * Deliberately implemented as an ordinary write: that snapshots the configuration
+ * being rolled back *from* (so a restore is itself undoable) and appends to the
+ * change log instead of rewriting history.
+ */
+export const restoreVersion = async (id: string, adminId: string): Promise<ConfigData | null> => {
+  const version = await readVersion(id)
+  if (!version) return null
+  return writeConfig({
+    config: version.config,
+    adminId,
+    action: "Configuration restored",
+    changeDetails: `Restored version ${version.summary.id} (saved ${version.summary.savedAt})`,
+  })
+}
+
 /**
  * Load current state, seeding the volume on first boot.
  *
@@ -159,6 +331,12 @@ export const writeConfig = async (update: {
       config: newConfig,
       lastModified,
       changeLog: [logEntry, ...current.changeLog].slice(0, MAX_CHANGELOG_ENTRIES),
+    }
+
+    // Keep a copy of what we are about to overwrite, so a bad save can be undone.
+    // Skipped when persistence is unavailable — there is nowhere to put it.
+    if (persistenceAvailable !== false && current.config) {
+      await snapshotCurrent(current, details, adminId)
     }
 
     try {
