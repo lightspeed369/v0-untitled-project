@@ -34,6 +34,16 @@ the password server-side, so it runs anywhere a disk can be mounted.
 4. **Health check** is `/api/config/status`, already set in `railway.json`. It returns
    the resolved data directory and whether it is writable.
 
+5. **Turn OFF automatic deploys.** Most commits in this repo carry `#VERCEL_SKIP`
+   because deploys are gated deliberately — pushing should never change production on
+   its own. Either:
+   - don't connect the GitHub repo, and deploy explicitly with `railway up`; or
+   - connect it and disable **Automatic Deploys** in the service's settings, then
+     trigger each deploy by hand.
+
+   Nothing in `railway.json` enables auto-deploy; it comes from the GitHub connection,
+   so this is a setting to check in the Railway UI rather than something in this repo.
+
 ## First boot and data
 
 On first boot, if `$DATA_DIR/config.json` does not exist, it is created from
