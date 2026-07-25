@@ -45,7 +45,7 @@
         "RS 4 (4.2L) (AWD)('07)": {
           "baseClass": "TTD"
         },
-        "TT RS ": {
+        "TT RS": {
           "baseClass": "TTC"
         },
         "TT": {
@@ -89,13 +89,13 @@
         "M2 (G8x)": {
           "baseClass": "TTC*"
         },
-        "M6 ": {
+        "M6": {
           "baseClass": "TTC"
         },
         "MINI Cooper S": {
           "baseClass": "TTS"
         },
-        "MINI JCW ": {
+        "MINI JCW": {
           "baseClass": "TTE"
         },
         "135i Coupe ('08-12)": {
@@ -135,7 +135,7 @@
         }
       },
       "Chevrolet": {
-        "Camaro ZL1 & Z28  (5th Gen)": {
+        "Camaro ZL1 & Z28 (5th Gen)": {
           "baseClass": "TTC"
         },
         "Camaro ZL1 (6th Gen)": {
@@ -162,7 +162,7 @@
         "Corvette C7 Z06": {
           "baseClass": "TTB*"
         },
-        "Corvette C7 Base/Z51/GS ": {
+        "Corvette C7 Base/Z51/GS": {
           "baseClass": "TTB"
         },
         "Corvette C7 ZR1": {
@@ -230,7 +230,7 @@
         "Focus RS": {
           "baseClass": "TTD"
         },
-        "Focus ST 2.0L ": {
+        "Focus ST 2.0L": {
           "baseClass": "TTS*"
         },
         "Mustang 2.3L turbo ('15)": {
@@ -241,10 +241,10 @@
         }
       },
       "Honda": {
-        "Civic & SI  (Pre-'05)": {
+        "Civic & SI (Pre-'05)": {
           "baseClass": "TTS"
         },
-        "Civic & SI  ('06 -Present)": {
+        "Civic & SI ('06 -Present)": {
           "baseClass": "TTS*"
         },
         "CTR FK8 & FL5": {
@@ -258,18 +258,18 @@
         }
       },
       "Hyundai": {
-        "Elantra/Kona/Veloster  N": {
+        "Elantra/Kona/Veloster N": {
           "baseClass": "TTE"
         },
         "Elantra 2.0L ('00-'08)": {
           "baseClass": "TTS"
         },
-        "Genesis 3.8L ": {
+        "Genesis 3.8L": {
           "baseClass": "TTE"
         }
       },
       "Infiniti": {
-        "G35 ": {
+        "G35": {
           "baseClass": "TTS*"
         },
         "G37": {
@@ -305,7 +305,7 @@
         "Elise": {
           "baseClass": "TTD"
         },
-        "Exige ": {
+        "Exige": {
           "baseClass": "TTC"
         },
         "Evora Base": {
@@ -336,7 +336,7 @@
         "RX-7 FD": {
           "baseClass": "TTE"
         },
-        "RX-8 ": {
+        "RX-8": {
           "baseClass": "TTE"
         },
         "Mazdaspeed3": {
@@ -361,7 +361,7 @@
           "baseClass": "TTE"
         }
       },
-      "Mclaren": {
+      "McLaren": {
         "MP4-12C": {
           "baseClass": "TTA"
         },
@@ -402,24 +402,24 @@
         }
       },
       "Mitsubishi": {
-        "Lancer Evo VIII ": {
+        "Lancer Evo VIII": {
           "baseClass": "TTD"
         },
         "Lancer Evo VII": {
           "baseClass": "TTD"
         },
-        "Lancer Evo X ": {
+        "Lancer Evo X": {
           "baseClass": "TTD*"
         }
       },
       "Nissan": {
-        "350Z ": {
+        "350Z": {
           "baseClass": "TTD"
         },
         "350Z Nismo ('07-'08)": {
           "baseClass": "TTD*"
         },
-        "370Z ": {
+        "370Z": {
           "baseClass": "TTD*"
         },
         "GT-R": {
@@ -427,7 +427,7 @@
         }
       },
       "Pontiac": {
-        "GTO ": {
+        "GTO": {
           "baseClass": "TTC"
         }
       },
@@ -559,17 +559,17 @@
     },
     "engine": [
       "Aftermarket Air Intake (1)",
-      "Cat-back Exhaust  (2)",
-      "Header/Downpipe  (2)",
-      "Removal of Catalytic Converter  (3)",
-      "Aftermarket Turbocharger/Supercharger  (5)",
-      "NA Vehicle ECU Tuning  (3)",
-      "FI Vehicle ECU Tuning  (6)",
+      "Cat-back Exhaust (2)",
+      "Header/Downpipe (2)",
+      "Removal of Catalytic Converter (3)",
+      "Aftermarket Turbocharger/Supercharger (5)",
+      "NA Vehicle ECU Tuning (3)",
+      "FI Vehicle ECU Tuning (6)",
       "Aftermarket Camshafts (4)"
     ],
     "drivetrain": [
       "Aftermarket driveshaft (1)",
-      "Aftermarket LSD  (2)"
+      "Aftermarket LSD (2)"
     ],
     "suspension": [
       "Lowering Springs (1)",
@@ -583,7 +583,7 @@
       "Coilover 4-Way (6)"
     ],
     "chassis": [
-      "Paragon Performance BBK  (0)",
+      "Paragon Performance BBK (0)",
       "Big Brake Kit (2)"
     ],
     "aero": [
@@ -658,17 +658,17 @@
     "scoreLookupTable": {
       "engine": {
         "Aftermarket Air Intake (1)": 1,
-        "Cat-back Exhaust  (2)": 2,
-        "Header/Downpipe  (2)": 2,
-        "Removal of Catalytic Converter  (3)": 3,
-        "Aftermarket Turbocharger/Supercharger  (5)": 5,
-        "NA Vehicle ECU Tuning  (3)": 3,
-        "FI Vehicle ECU Tuning  (6)": 6,
+        "Cat-back Exhaust (2)": 2,
+        "Header/Downpipe (2)": 2,
+        "Removal of Catalytic Converter (3)": 3,
+        "Aftermarket Turbocharger/Supercharger (5)": 5,
+        "NA Vehicle ECU Tuning (3)": 3,
+        "FI Vehicle ECU Tuning (6)": 6,
         "Aftermarket Camshafts (4)": 4
       },
       "drivetrain": {
         "Aftermarket driveshaft (1)": 1,
-        "Aftermarket LSD  (2)": 2
+        "Aftermarket LSD (2)": 2
       },
       "suspension": {
         "Lowering Springs (1)": 1,
@@ -682,7 +682,7 @@
         "Coilover 4-Way (6)": 6
       },
       "chassis": {
-        "Paragon Performance BBK  (0)": 0,
+        "Paragon Performance BBK (0)": 0,
         "Big Brake Kit (2)": 2
       },
       "aero": {
