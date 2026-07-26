@@ -82,14 +82,18 @@ check("login succeeds after 4 failures", status == 200, f"status={status}")
 codes = [login("wrong", client="10.0.0.3")[0] for _ in range(6)]
 check("allowance was reset by the success", codes == [401] * 6, f"codes={codes}")
 
-print("\n=== E. SPOOFED X-FORWARDED-FOR CANNOT RESET THE LIMIT ===")
-# 10.0.0.1 is blocked. A client prepending its own XFF entry must not escape:
-# the rightmost value (the one a real proxy appends) is what counts.
-status, _ = login("wrong", client="1.2.3.4, 10.0.0.1")
-check("prepending a fake IP does not bypass the block", status == 429, f"status={status}")
-status, _ = login("wrong", client="10.0.0.1, 1.2.3.4")
-check("a genuinely different rightmost IP is treated as a new client",
-      status == 401, f"status={status}")
+print("\n=== E. ROTATING PROXY HOPS MUST NOT CREATE NEW BUCKETS ===")
+# This is the regression test for a real bug. Railway sets x-forwarded-for to
+# "<client>, <railway-hop>" and that trailing hop rotates across their fleet per
+# request. Keying on the rightmost value therefore handed every request a fresh bucket
+# and the limiter silently never engaged in production, while passing locally.
+# 10.0.0.1 is already blocked from section A.
+status, _ = login("wrong", client="10.0.0.1, 172.16.0.1")
+check("appending a proxy hop keeps the same bucket (still blocked)", status == 429, f"status={status}")
+status, _ = login("wrong", client="10.0.0.1, 172.16.0.99")
+check("a DIFFERENT trailing hop also keeps the same bucket", status == 429, f"status={status}")
+status, _ = login("wrong", client="10.9.9.9, 172.16.0.1")
+check("a genuinely different client IP is a new bucket", status == 401, f"status={status}")
 
 print("\n=== F. PUBLIC CALCULATOR IS UNAFFECTED ===")
 with urllib.request.urlopen(BASE + "/api/config", timeout=30) as r:

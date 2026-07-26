@@ -42,6 +42,11 @@ export async function POST(request: Request) {
 
   if (!verifyPassword(password)) {
     recordFailure(key)
+    // Audit trail for failed admin logins. Logs the rate-limit key only — never the
+    // attempted password.
+    console.warn(
+      `[auth] failed admin login  key=${key}  xff=${request.headers.get("x-forwarded-for") ?? "-"}`,
+    )
     return NextResponse.json({ success: false, message: "Invalid password." }, { status: 401 })
   }
 
