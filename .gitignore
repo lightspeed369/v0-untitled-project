@@ -30,3 +30,6 @@ next-env.d.ts
 # live config state (lives on the mounted volume, never in git)
 data/config.json
 data/config.json.*
+
+# python bytecode from the test suites
+tests/__pycache__/
