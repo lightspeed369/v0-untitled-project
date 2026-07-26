@@ -24,18 +24,32 @@ interface Entry {
 const attempts = new Map<string, Entry>()
 
 /**
- * Identify the client.
+ * Identify the client: the FIRST value of x-forwarded-for.
  *
- * Takes the LAST value of x-forwarded-for, not the first: a client can send its own
- * x-forwarded-for header, and proxies append rather than replace, so the leftmost entry
- * is attacker-controlled while the rightmost was added by the proxy in front of us.
- * Using the first would let anyone reset their own limit at will.
+ * The usual advice is to prefer the rightmost entry, because clients can forge
+ * x-forwarded-for and proxies that append leave the leftmost value attacker-controlled.
+ * That advice is wrong for this deployment, and the first implementation here got it
+ * wrong as a result.
+ *
+ * Verified against Railway by logging the header as received:
+ *
+ *   xff=108.224.88.209, 84.17.44.225      <- real client, then a Railway hop
+ *   xff=108.224.88.209, 84.17.44.228      <- same client, DIFFERENT hop
+ *
+ * Two things follow. The trailing hop rotates across Railway's fleet per request, so
+ * keying on it hands every request a fresh bucket and the limiter never engages. And
+ * Railway discards any x-forwarded-for the client sends — a request with
+ * "X-Forwarded-For: 9.9.9.9" still arrived as "108.224.88.209, <hop>" — so the leftmost
+ * entry is set by the proxy, not the caller, and is safe to trust here.
+ *
+ * If this is ever moved behind a different proxy, re-verify: the safety of the leftmost
+ * value depends on the proxy replacing the header rather than appending to it.
  */
 export const clientKey = (request: Request): string => {
   const forwarded = request.headers.get("x-forwarded-for")
   if (forwarded) {
     const parts = forwarded.split(",").map((p) => p.trim()).filter(Boolean)
-    if (parts.length) return parts[parts.length - 1]
+    if (parts.length) return parts[0]
   }
   return request.headers.get("x-real-ip") || "unknown"
 }
