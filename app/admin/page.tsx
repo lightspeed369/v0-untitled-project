@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "@/components/ui/use-toast"
-import { Check, Edit, Lock, Save, X } from "lucide-react"
+import { Check, Edit, Lock, Save, X, History, Clock, AlertTriangle, RotateCcw } from "lucide-react"
 import {
   getCurrentConfig,
   saveConfigToServer,
@@ -28,6 +28,9 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
   const [config, setConfig] = useState<any>(null)
+  const [originalConfig, setOriginalConfig] = useState<any>(null)
+  const [changeLog, setChangeLog] = useState<any[]>([])
+  const [lastModified, setLastModified] = useState<string>("")
   const [activeTab, setActiveTab] = useState("cars")
   const [selectedMake, setSelectedMake] = useState("")
   const [selectedModel, setSelectedModel] = useState("")
@@ -45,14 +48,45 @@ export default function AdminPage() {
   const [editModName, setEditModName] = useState("")
   const [editModPoints, setEditModPoints] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [adminId] = useState("lsadmin")
+  const [isPersistenceEnabled, setIsPersistenceEnabled] = useState(true)
+  const [versions, setVersions] = useState<any[]>([])
+  const [isRestoring, setIsRestoring] = useState<string | null>(null)
+  const [confirmRestoreId, setConfirmRestoreId] = useState<string | null>(null)
+
+  // Restore an existing admin session on mount so a page reload doesn't force a
+  // re-login, and warn early if the server has no admin password configured.
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const response = await fetch("/api/admin/session", { cache: "no-store" })
+        const data = await response.json()
+        if (data.authenticated) setIsAuthenticated(true)
+        if (!data.authConfigured) {
+          toast({
+            variant: "destructive",
+            title: "Admin access not configured",
+            description: "ADMIN_PASSWORD is not set on the server, so configuration cannot be saved.",
+          })
+        }
+      } catch (error) {
+        console.error("Error checking session:", error)
+      }
+    }
+    restoreSession()
+  }, [])
 
   // Load configuration on component mount
   useEffect(() => {
     const loadConfig = async () => {
       setIsLoading(true)
       try {
-        const currentConfig = await getCurrentConfig()
-        setConfig(currentConfig)
+        const currentData = await getCurrentConfig()
+        setConfig(currentData.config)
+        setOriginalConfig(JSON.parse(JSON.stringify(currentData.config))) // Deep copy for comparison
+        setChangeLog(currentData.changeLog || [])
+        setLastModified(currentData.lastModified || "")
+        setIsPersistenceEnabled(currentData.isPersistenceEnabled) // Set the new state
       } catch (error) {
         console.error("Error loading configuration:", error)
         toast({
@@ -81,11 +115,11 @@ export default function AdminPage() {
         title: "Server Status",
         description: (
           <div className="space-y-2 mt-2">
-            <p>Data directory exists: {status.dataDirectoryExists ? "✅" : "❌"}</p>
-            <p>Data directory writable: {status.dataDirectoryWritable ? "✅" : "❌"}</p>
+            <p>Data directory: {status.dataDir}</p>
+            <p>Directory exists: {status.dataDirectoryExists ? "✅" : "❌"}</p>
+            <p>Directory writable: {status.dataDirectoryWritable ? "✅" : "❌"}</p>
             <p>Config file exists: {status.configFileExists ? "✅" : "❌"}</p>
-            <p>Config file readable: {status.configFileReadable ? "✅" : "❌"}</p>
-            <p>Config file writable: {status.configFileWritable ? "✅" : "❌"}</p>
+            <p>Changes persist: {status.isPersistenceEnabled ? "✅" : "❌"}</p>
             <p>Server time: {new Date(status.serverTime).toLocaleString()}</p>
           </div>
         ),
@@ -101,27 +135,106 @@ export default function AdminPage() {
     }
   }
 
-  // Handle authentication
-  const handleAuthenticate = () => {
-    // In a real application, you would use a secure authentication method
-    // For this demo, we're using a simple password check
-    if (password === "admin123") {
-      setIsAuthenticated(true)
-      toast({
-        title: "Authentication successful",
-        description: "You are now logged in as an administrator.",
+  // Handle authentication.
+  // The password is verified server-side; it is never compared in the browser and
+  // never shipped in the client bundle. On success the server sets an httpOnly
+  // session cookie, which is what actually authorises writes to /api/config.
+  const handleAuthenticate = async () => {
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
       })
-    } else {
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setIsAuthenticated(true)
+        setPassword("")
+        toast({
+          title: "Authentication successful",
+          description: "You are now logged in as an administrator.",
+        })
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Authentication failed",
+          description: data.message || "Invalid password. Please try again.",
+        })
+      }
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Authentication failed",
-        description: "Invalid password. Please try again.",
+        description: `Could not reach the server: ${error}`,
       })
     }
   }
 
-  // Handle logout
-  const handleLogout = () => {
+  // Version history is admin-only, so it can only be fetched once authenticated.
+  const loadVersions = async () => {
+    try {
+      const response = await fetch("/api/config/versions", { cache: "no-store" })
+      if (!response.ok) return
+      const data = await response.json()
+      setVersions(data.versions || [])
+    } catch (error) {
+      console.error("Error loading versions:", error)
+    }
+  }
+
+  useEffect(() => {
+    if (isAuthenticated) loadVersions()
+  }, [isAuthenticated])
+
+  // Roll the live configuration back to an earlier snapshot. The server treats this
+  // as an ordinary write, so the current state is snapshotted first and this restore
+  // is itself undoable.
+  const handleRestoreVersion = async (versionId: string) => {
+    setIsRestoring(versionId)
+    try {
+      const response = await fetch(`/api/config/versions/${versionId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminId }),
+      })
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        const refreshed = await getCurrentConfig()
+        setConfig(refreshed.config)
+        setOriginalConfig(JSON.parse(JSON.stringify(refreshed.config)))
+        setChangeLog(refreshed.changeLog || [])
+        setLastModified(refreshed.lastModified || "")
+        saveConfigToStorage(refreshed.config, refreshed.lastModified)
+        broadcastConfigChange(refreshed.config, refreshed.lastModified)
+        await loadVersions()
+        toast({
+          title: "Configuration restored",
+          description: "The earlier version is now live. This restore can itself be undone.",
+        })
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Restore failed",
+          description: data.message || "Could not restore that version.",
+        })
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Restore failed", description: String(error) })
+    } finally {
+      setIsRestoring(null)
+      setConfirmRestoreId(null)
+    }
+  }
+
+  // Handle logout — clears the server session cookie too, not just local state.
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/admin/session", { method: "DELETE" })
+    } catch (error) {
+      console.error("Error clearing session:", error)
+    }
     setIsAuthenticated(false)
     setPassword("")
   }
@@ -418,15 +531,31 @@ export default function AdminPage() {
   const handleSaveConfig = async () => {
     setSaveSuccess(false)
 
-    // First, save to the server
-    const serverResult = await saveConfigToServer(config)
+    // First, save to the server with admin info and original config for comparison
+    const serverResult = await saveConfigToServer(
+      config,
+      adminId,
+      "Configuration updated via admin panel",
+      originalConfig,
+    )
 
     // Also save to localStorage as a backup
-    const localSuccess = saveConfigToStorage(config)
+    const localSuccess = saveConfigToStorage(config, serverResult.data?.timestamp)
 
     if (serverResult.success) {
+      // Update local state with new change log
+      if (serverResult.data?.changeLog) {
+        setChangeLog(serverResult.data.changeLog)
+      }
+      if (serverResult.data?.timestamp) {
+        setLastModified(serverResult.data.timestamp)
+      }
+
+      // Update original config to current config for next comparison
+      setOriginalConfig(JSON.parse(JSON.stringify(config))) // Deep copy
+
       // Broadcast the configuration change
-      broadcastConfigChange(config)
+      broadcastConfigChange(config, serverResult.data?.timestamp)
 
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
@@ -438,9 +567,8 @@ export default function AdminPage() {
       toast({
         variant: "destructive",
         title: "Server save failed",
-        description: localSuccess
-          ? `Changes were saved locally but failed to save to the server: ${serverResult.error || "Unknown error"}. Only you will see these changes.`
-          : `There was an error saving your configuration: ${serverResult.error || "Unknown error"}. Please try again.`,
+        description: `Failed to save to server: ${serverResult.error || "Unknown error"}. If persistence is disabled, check that a writable volume is mounted at DATA_DIR.`,
+        duration: 9000,
       })
     }
   }
@@ -502,8 +630,21 @@ export default function AdminPage() {
             )}
           </div>
           <CardDescription>Manage car makes, models, and modification categories</CardDescription>
+          {lastModified && (
+            <div className="text-sm text-gray-400 mt-2">Last modified: {new Date(lastModified).toLocaleString()}</div>
+          )}
         </CardHeader>
         <CardContent className="pt-6">
+          {!isPersistenceEnabled && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Persistence is Disabled</AlertTitle>
+              <AlertDescription>
+                The server's data directory is not writable, so any changes you make will be lost when the server
+                restarts. Check that a persistent volume is mounted and that DATA_DIR points at it.
+              </AlertDescription>
+            </Alert>
+          )}
           {!isAuthenticated ? (
             <div className="space-y-4">
               <Alert className="bg-black border-[#fec802]/30">
@@ -511,27 +652,49 @@ export default function AdminPage() {
                 <AlertTitle>Authentication Required</AlertTitle>
                 <AlertDescription>Please enter the administrator password to access the admin panel.</AlertDescription>
               </Alert>
-              <div className="flex gap-4">
-                <Input
-                  type="password"
-                  placeholder="Enter admin password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <Button onClick={handleAuthenticate}>Login</Button>
-                <Button variant="outline" onClick={() => (window.location.href = "/")}>
-                  Back to Home
-                </Button>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="admin-id">Admin ID</Label>
+                  {/* Fixed: there is one admin identity and the server stamps it on
+                      every change, so this is shown for information only. */}
+                  <Input id="admin-id" value={adminId} readOnly disabled />
+                </div>
+                <div className="flex gap-4">
+                  <Input
+                    type="password"
+                    placeholder="Enter admin password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <Button onClick={handleAuthenticate}>Login</Button>
+                  <Button variant="outline" onClick={() => (window.location.href = "/")}>
+                    Back to Home
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-black border border-[#fec802]/30">
+              <TabsList className="grid w-full grid-cols-4 bg-black border border-[#fec802]/30">
                 <TabsTrigger value="cars" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
                   Car Makes & Models
                 </TabsTrigger>
                 <TabsTrigger value="mods" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
                   Modification Categories
+                </TabsTrigger>
+                <TabsTrigger
+                  value="changelog"
+                  className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                >
+                  <History className="h-4 w-4 mr-2" />
+                  Change Log
+                </TabsTrigger>
+                <TabsTrigger
+                  value="versions"
+                  className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Versions
                 </TabsTrigger>
               </TabsList>
 
@@ -866,6 +1029,166 @@ export default function AdminPage() {
                     </Card>
                   )}
                 </div>
+              </TabsContent>
+
+              <TabsContent value="changelog" className="space-y-6 mt-4">
+                <Card className="border-[#fec802]/30 bg-black">
+                  <CardHeader className="border-b border-[#fec802]/30">
+                    <CardTitle className="flex items-center gap-2">
+                      <History className="h-5 w-5 text-[#fec802]" />
+                      Admin Change Log
+                    </CardTitle>
+                    <CardDescription>
+                      Detailed track of all administrative changes made to the configuration
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    {changeLog.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400">
+                        <p>No changes recorded yet.</p>
+                        <p className="text-sm mt-2">Changes will appear here after admin modifications are saved.</p>
+                      </div>
+                    ) : (
+                      <ScrollArea className="h-[500px] pr-4">
+                        <div className="space-y-4">
+                          {changeLog.map((entry, index) => (
+                            <div key={index} className="p-4 bg-black border border-[#fec802]/30 rounded-lg">
+                              <div className="flex justify-between items-start mb-3">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-4 w-4 text-[#fec802]" />
+                                  <span className="font-medium text-[#fec802]">{entry.action}</span>
+                                </div>
+                                <span className="text-sm text-gray-400">
+                                  {new Date(entry.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+
+                              {entry.adminId && (
+                                <p className="text-sm text-gray-400 mb-2">
+                                  <strong>Admin:</strong> {entry.adminId}
+                                </p>
+                              )}
+
+                              <div className="text-sm text-gray-300">
+                                <strong>Changes Made:</strong>
+                                <div className="mt-2 pl-4 border-l-2 border-[#fec802]/30">
+                                  {entry.details ? (
+                                    entry.details.split("; ").map((change, changeIndex) => (
+                                      <div key={changeIndex} className="py-1">
+                                        • {change}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="py-1">• No specific changes recorded.</div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="versions" className="space-y-6 mt-4">
+                <Card className="border-[#fec802]/30 bg-black">
+                  <CardHeader className="border-b border-[#fec802]/30">
+                    <CardTitle className="flex items-center gap-2">
+                      <RotateCcw className="h-5 w-5 text-[#fec802]" />
+                      Previous Versions
+                    </CardTitle>
+                    <CardDescription>
+                      A copy of the configuration is kept every time it is saved. Restoring one puts it
+                      back live — and because a restore is saved like any other change, you can undo it too.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    {versions.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400">
+                        <p>No previous versions yet.</p>
+                        <p className="text-sm mt-2">
+                          The first one is created the next time you save a change.
+                        </p>
+                      </div>
+                    ) : (
+                      <ScrollArea className="h-[500px] pr-4">
+                        <div className="space-y-4">
+                          {versions.map((version) => (
+                            <div
+                              key={version.id}
+                              className="p-4 bg-black border border-[#fec802]/30 rounded-lg"
+                            >
+                              <div className="flex justify-between items-start mb-3 gap-4">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-4 w-4 text-[#fec802]" />
+                                  <span className="font-medium text-[#fec802]">
+                                    {version.savedAt ? new Date(version.savedAt).toLocaleString() : version.id}
+                                  </span>
+                                </div>
+                                <span className="text-sm text-gray-400 whitespace-nowrap">
+                                  {version.makeCount} makes · {version.modelCount} models
+                                </span>
+                              </div>
+
+                              {version.adminId && (
+                                <p className="text-sm text-gray-400 mb-2">
+                                  <strong>Replaced by:</strong> {version.adminId}
+                                </p>
+                              )}
+
+                              {version.note && (
+                                <div className="text-sm text-gray-300 mb-3">
+                                  <strong>Superseded by:</strong>
+                                  <div className="mt-2 pl-4 border-l-2 border-[#fec802]/30 text-gray-400">
+                                    {version.note}
+                                  </div>
+                                </div>
+                              )}
+
+                              {confirmRestoreId === version.id ? (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm text-gray-300">
+                                    Replace the live configuration with this version?
+                                  </span>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleRestoreVersion(version.id)}
+                                    disabled={isRestoring === version.id}
+                                    className="bg-[#fec802] text-black hover:bg-[#fec802]/80"
+                                  >
+                                    <Check className="h-4 w-4 mr-1" />
+                                    {isRestoring === version.id ? "Restoring…" : "Yes, restore"}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setConfirmRestoreId(null)}
+                                    disabled={isRestoring === version.id}
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Cancel
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setConfirmRestoreId(version.id)}
+                                  className="border-[#fec802]/30"
+                                >
+                                  <RotateCcw className="h-4 w-4 mr-1" />
+                                  Restore this version
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           )}

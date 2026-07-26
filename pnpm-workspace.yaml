@@ -1,0 +1,6 @@
+# sharp ships a native postinstall build. Next only needs it for image
+# optimisation, which is disabled (next.config.mjs -> images.unoptimized), but the
+# build is allowed explicitly so `pnpm install` never stops to ask — otherwise the
+# Docker build fails with ERR_PNPM_IGNORED_BUILDS.
+allowBuilds:
+  sharp: true

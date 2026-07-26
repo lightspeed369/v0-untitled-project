@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.github
+.vercel
+npm-debug.log*
+README.md
+.env
+.env.*
+!.env.example
+# Never bake live state into the image; only the seed is copied, explicitly.
+data/config.json
