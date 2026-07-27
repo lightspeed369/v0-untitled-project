@@ -4,3 +4,18 @@
 # Docker build fails with ERR_PNPM_IGNORED_BUILDS.
 allowBuilds:
   sharp: true
+
+# Refreshing the lockfile cleared most of the Dependabot advisories on its own.
+# These two can't be reached that way, because their parent pins them below the
+# patched line, so they need an explicit override:
+#
+#   postcss  next pins it exactly at 8.4.31; the fixes (sourceMappingURL path
+#            traversal, attacker-controlled file read, </style> XSS) land in
+#            8.5.10/8.5.12/8.5.18. Same major, and the emitted CSS is byte-identical
+#            apart from tailwind's own version banner.
+#   sharp    next declares it optional at ^0.34.3; the libvips CVE fixes are in
+#            0.35.x. Nothing here actually calls it — images.unoptimized is set —
+#            but an unpatched native binary in the image is still worth avoiding.
+overrides:
+  postcss: ^8.5.23
+  sharp: ^0.35.3
