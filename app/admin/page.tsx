@@ -24,6 +24,15 @@ import {
   broadcastConfigChange,
 } from "@/lib/admin-utils"
 
+// Radix gives the ScrollArea viewport's content wrapper an inline `display: table`,
+// which sizes it to the content's preferred width instead of the viewport's. On a
+// phone that let list rows lay out wider than the scroller and get clipped — the
+// delete button on a modification was sliced in half. Forcing the wrapper back to a
+// block makes rows wrap to the available width. It needs `!` because the display is
+// an inline style. This is applied per call site, not in components/ui/scroll-area,
+// because the calculator uses a ScrollArea for a deliberately horizontal tab strip.
+const CLAMP_SCROLL_AREA_WIDTH = "[&_[data-radix-scroll-area-viewport]>div]:!block"
+
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
@@ -616,14 +625,20 @@ export default function AdminPage() {
     <div className="container mx-auto px-4 py-8">
       <Card className="border-[#fec802]/30 bg-black mb-8">
         <CardHeader className="border-b border-[#fec802]/30">
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-3xl">LightSpeed Admin Panel</CardTitle>
+          {/* Stacks on phones: the title and the two buttons cannot share one row at
+              375–390px, and both are whitespace-nowrap, so side by side they overlap. */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-2xl sm:text-3xl">LightSpeed Admin Panel</CardTitle>
             {isAuthenticated && (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => (window.location.href = "/")}>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 sm:flex-none"
+                  onClick={() => (window.location.href = "/")}
+                >
                   Back to Home
                 </Button>
-                <Button variant="outline" onClick={handleLogout}>
+                <Button variant="outline" className="flex-1 sm:flex-none" onClick={handleLogout}>
                   Logout
                 </Button>
               </div>
@@ -659,41 +674,62 @@ export default function AdminPage() {
                       every change, so this is shown for information only. */}
                   <Input id="admin-id" value={adminId} readOnly disabled />
                 </div>
-                <div className="flex gap-4">
+                {/* On one row at phone width the two nowrap buttons squeeze the password
+                    field down to ~65px, so the field gets its own row on mobile. */}
+                <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
                   <Input
                     type="password"
                     placeholder="Enter admin password"
+                    className="sm:min-w-0 sm:flex-1"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
-                  <Button onClick={handleAuthenticate}>Login</Button>
-                  <Button variant="outline" onClick={() => (window.location.href = "/")}>
-                    Back to Home
-                  </Button>
+                  <div className="flex gap-2 sm:shrink-0">
+                    <Button className="flex-1 sm:flex-none" onClick={handleAuthenticate}>
+                      Login
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 sm:flex-none"
+                      onClick={() => (window.location.href = "/")}
+                    >
+                      Back to Home
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
           ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-4 bg-black border border-[#fec802]/30">
-                <TabsTrigger value="cars" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
+              {/* Four columns only fits from md up. At 390px each cell is ~71px while the
+                  labels need 80–116px, and TabsTrigger is whitespace-nowrap, so every label
+                  used to spill out of its cell and print on top of its neighbour. Two rows of
+                  two, with labels allowed to wrap, keeps all four tabs readable and tappable. */}
+              <TabsList className="grid h-auto w-full grid-cols-2 items-stretch gap-1 bg-black border border-[#fec802]/30 md:grid-cols-4">
+                <TabsTrigger
+                  value="cars"
+                  className="h-auto whitespace-normal px-2 py-2 text-center text-xs leading-tight data-[state=active]:bg-[#fec802] data-[state=active]:text-black sm:text-sm"
+                >
                   Car Makes & Models
                 </TabsTrigger>
-                <TabsTrigger value="mods" className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black">
+                <TabsTrigger
+                  value="mods"
+                  className="h-auto whitespace-normal px-2 py-2 text-center text-xs leading-tight data-[state=active]:bg-[#fec802] data-[state=active]:text-black sm:text-sm"
+                >
                   Modification Categories
                 </TabsTrigger>
                 <TabsTrigger
                   value="changelog"
-                  className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                  className="h-auto whitespace-normal px-2 py-2 text-center text-xs leading-tight data-[state=active]:bg-[#fec802] data-[state=active]:text-black sm:text-sm"
                 >
-                  <History className="h-4 w-4 mr-2" />
+                  <History className="h-4 w-4 mr-2 shrink-0" />
                   Change Log
                 </TabsTrigger>
                 <TabsTrigger
                   value="versions"
-                  className="data-[state=active]:bg-[#fec802] data-[state=active]:text-black"
+                  className="h-auto whitespace-normal px-2 py-2 text-center text-xs leading-tight data-[state=active]:bg-[#fec802] data-[state=active]:text-black sm:text-sm"
                 >
-                  <RotateCcw className="h-4 w-4 mr-2" />
+                  <RotateCcw className="h-4 w-4 mr-2 shrink-0" />
                   Versions
                 </TabsTrigger>
               </TabsList>
@@ -966,7 +1002,7 @@ export default function AdminPage() {
                         <CardDescription>Click on a modification to edit it</CardDescription>
                       </CardHeader>
                       <CardContent className="pt-6">
-                        <ScrollArea className="h-[300px] pr-4">
+                        <ScrollArea className={`h-[300px] pr-4 ${CLAMP_SCROLL_AREA_WIDTH}`}>
                           {config[selectedCategory] && config[selectedCategory].length > 0 ? (
                             <div className="space-y-4">
                               {config[selectedCategory].map((mod: string, index: number) => (
@@ -1002,9 +1038,11 @@ export default function AdminPage() {
                                       </div>
                                     </div>
                                   ) : (
-                                    <div className="flex justify-between items-center p-3 border border-[#fec802]/20 rounded-lg hover:border-[#fec802]/50 transition-colors">
-                                      <span>{mod}</span>
-                                      <div className="flex gap-2">
+                                    <div className="flex items-center justify-between gap-2 p-3 border border-[#fec802]/20 rounded-lg hover:border-[#fec802]/50 transition-colors">
+                                      {/* Long modification names must wrap rather than shove
+                                          the edit/delete buttons off the card. */}
+                                      <span className="min-w-0 flex-1 break-words">{mod}</span>
+                                      <div className="flex shrink-0 gap-1">
                                         <Button variant="ghost" size="sm" onClick={() => handleStartEditMod(mod)}>
                                           <Edit className="h-4 w-4" />
                                         </Button>
@@ -1049,16 +1087,18 @@ export default function AdminPage() {
                         <p className="text-sm mt-2">Changes will appear here after admin modifications are saved.</p>
                       </div>
                     ) : (
-                      <ScrollArea className="h-[500px] pr-4">
+                      <ScrollArea className={`h-[500px] pr-4 ${CLAMP_SCROLL_AREA_WIDTH}`}>
                         <div className="space-y-4">
                           {changeLog.map((entry, index) => (
                             <div key={index} className="p-4 bg-black border border-[#fec802]/30 rounded-lg">
-                              <div className="flex justify-between items-start mb-3">
-                                <div className="flex items-center gap-2">
-                                  <Clock className="h-4 w-4 text-[#fec802]" />
-                                  <span className="font-medium text-[#fec802]">{entry.action}</span>
+                              {/* Action label and timestamp each need the full width on a
+                                  phone; sharing a row crushed both into overlapping columns. */}
+                              <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                                <div className="flex min-w-0 items-start gap-2">
+                                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#fec802]" />
+                                  <span className="min-w-0 break-words font-medium text-[#fec802]">{entry.action}</span>
                                 </div>
-                                <span className="text-sm text-gray-400">
+                                <span className="text-sm text-gray-400 sm:whitespace-nowrap">
                                   {new Date(entry.timestamp).toLocaleString()}
                                 </span>
                               </div>
@@ -1113,21 +1153,23 @@ export default function AdminPage() {
                         </p>
                       </div>
                     ) : (
-                      <ScrollArea className="h-[500px] pr-4">
+                      <ScrollArea className={`h-[500px] pr-4 ${CLAMP_SCROLL_AREA_WIDTH}`}>
                         <div className="space-y-4">
                           {versions.map((version) => (
                             <div
                               key={version.id}
                               className="p-4 bg-black border border-[#fec802]/30 rounded-lg"
                             >
-                              <div className="flex justify-between items-start mb-3 gap-4">
-                                <div className="flex items-center gap-2">
-                                  <Clock className="h-4 w-4 text-[#fec802]" />
-                                  <span className="font-medium text-[#fec802]">
+                              {/* The make/model count is nowrap, so on a phone it used to be
+                                  pushed past the card edge and clipped mid-word. */}
+                              <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                                <div className="flex min-w-0 items-start gap-2">
+                                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#fec802]" />
+                                  <span className="min-w-0 break-words font-medium text-[#fec802]">
                                     {version.savedAt ? new Date(version.savedAt).toLocaleString() : version.id}
                                   </span>
                                 </div>
-                                <span className="text-sm text-gray-400 whitespace-nowrap">
+                                <span className="text-sm text-gray-400 sm:whitespace-nowrap">
                                   {version.makeCount} makes · {version.modelCount} models
                                 </span>
                               </div>
@@ -1176,9 +1218,11 @@ export default function AdminPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => setConfirmRestoreId(version.id)}
-                                  className="border-[#fec802]/30"
+                                  className="h-auto whitespace-normal border-[#fec802]/30 py-1.5"
                                 >
-                                  <RotateCcw className="h-4 w-4 mr-1" />
+                                  {/* Buttons are nowrap by default; this label is wider than
+                                      the card on a 320px phone, so it has to be allowed to wrap. */}
+                                  <RotateCcw className="h-4 w-4 mr-1 shrink-0" />
                                   Restore this version
                                 </Button>
                               )}
@@ -1195,14 +1239,16 @@ export default function AdminPage() {
         </CardContent>
       </Card>
 
+      {/* justify-end pushes overflow off the *left* edge, so on a phone the
+          "Check Server Status" button used to start at x=-12 and be clipped. */}
       {isAuthenticated && (
-        <div className="flex justify-end gap-4">
-          <Button variant="outline" onClick={checkServerStatus}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end sm:gap-4">
+          <Button variant="outline" className="w-full sm:w-auto" onClick={checkServerStatus}>
             Check Server Status
           </Button>
           <Button
             onClick={handleSaveConfig}
-            className="bg-[#fec802] hover:bg-[#fec802]/80 text-black"
+            className="w-full bg-[#fec802] hover:bg-[#fec802]/80 text-black sm:w-auto"
             disabled={saveSuccess}
           >
             {saveSuccess ? (
